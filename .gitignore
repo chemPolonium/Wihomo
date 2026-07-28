@@ -1,4 +1,5 @@
 bin/
 obj/
+artifacts/
 tmp-mihomo-test/
 mihomo-src/
