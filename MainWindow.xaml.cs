@@ -5,7 +5,6 @@ using System.Net.Http;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Threading;
 using Wihomo.Models;
 using Wihomo.Services;
@@ -22,6 +21,7 @@ public partial class MainWindow : Window
     private readonly SettingsService _settingsService = new();
     private readonly MihomoConfigBuilder _configBuilder = new();
     private readonly SubscriptionConfigComposer _subscriptionConfigComposer = new();
+    private readonly SubscriptionFormatConverter _formatConverter = new();
     private readonly MihomoProcessManager _processManager = new();
     private readonly MihomoApiClient _apiClient = new();
     private readonly SystemProxyService _systemProxyService = new();
@@ -59,6 +59,7 @@ public partial class MainWindow : Window
         {
             _settings = await _settingsService.LoadAsync();
             ApplyDefaults();
+            EnsureSingleActiveSubscription();
             BindSettingsToUi();
             ResetStatsTimer();
             SetMessage($"设置已加载: {_settingsService.SettingsPath}");
@@ -227,7 +228,6 @@ public partial class MainWindow : Window
             var name = SubscriptionNameTextBox.Text.Trim();
             var url = SubscriptionUrlTextBox.Text.Trim();
             var interval = ParsePositiveInt(SubscriptionIntervalTextBox.Text, "更新间隔(秒)");
-            var enabled = SubscriptionEnabledCheckBox.IsChecked ?? true;
 
             if (string.IsNullOrWhiteSpace(name))
             {
@@ -247,15 +247,16 @@ public partial class MainWindow : Window
                     Name = name,
                     Url = url,
                     IntervalSeconds = interval,
-                    Enabled = enabled
+                    Enabled = false
                 });
+
                 SetMessage("已新增订阅。");
             }
             else
             {
                 existing.Url = url;
                 existing.IntervalSeconds = interval;
-                existing.Enabled = enabled;
+
                 SetMessage("已更新订阅。");
             }
 
@@ -289,20 +290,14 @@ public partial class MainWindow : Window
         SubscriptionNameTextBox.Text = selected.Name;
         SubscriptionUrlTextBox.Text = selected.Url;
         SubscriptionIntervalTextBox.Text = selected.IntervalSeconds.ToString(CultureInfo.InvariantCulture);
-        SubscriptionEnabledCheckBox.IsChecked = selected.Enabled;
     }
 
-    private async void UpdateSelectedProviderButton_Click(object sender, RoutedEventArgs e)
+    private async void ActivateSelectedSubscriptionButton_Click(object sender, RoutedEventArgs e)
     {
-        await ExecuteUiActionAsync(UpdateSelectedSubscriptionAsync);
+        await ExecuteUiActionAsync(ActivateSelectedSubscriptionAsync);
     }
 
-    private async void SubscriptionsListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-    {
-        await ExecuteUiActionAsync(UpdateSelectedSubscriptionAsync);
-    }
-
-    private async Task UpdateSelectedSubscriptionAsync()
+    private async Task ActivateSelectedSubscriptionAsync()
     {
         if (SubscriptionsListBox.SelectedIndex < 0 || SubscriptionsListBox.SelectedIndex >= _settings.Subscriptions.Count)
         {
@@ -310,6 +305,15 @@ public partial class MainWindow : Window
         }
 
         var selected = _settings.Subscriptions[SubscriptionsListBox.SelectedIndex];
+
+        // Activate this subscription and disable all others
+        DisableOtherSubscriptions(selected.Name);
+        selected.Enabled = true;
+        _settings.ActiveSubscriptionName = selected.Name;
+        await _settingsService.SaveAsync(_settings);
+        RefreshSubscriptionsList();
+        AppendLogLine($"已激活订阅: {selected.Name}");
+
         var providerKey = MihomoConfigBuilder.NormalizeName(selected.Name);
         await DownloadSubscriptionAndReloadAsync(selected, providerKey);
     }
@@ -926,7 +930,27 @@ public partial class MainWindow : Window
 
         AppendLogLine($"正在下载订阅文件: {subscription.Url}");
         var download = await _apiClient.DownloadSubscriptionAsync(subscription.Url);
-        var content = download.Content;
+        var rawContent = download.Content;
+
+        // Detect format and convert if needed (e.g. base64-encoded anytls URIs -> YAML)
+        var convertResult = _formatConverter.Convert(rawContent);
+        var content = convertResult.Content;
+
+        switch (convertResult.Format)
+        {
+            case SubscriptionFormat.Yaml:
+                AppendLogLine("订阅格式: YAML");
+                break;
+            case SubscriptionFormat.ConvertedFromUris:
+                AppendLogLine("订阅格式: 已从代理 URI 转换为 YAML 配置");
+                break;
+            default:
+                AppendLogLine("错误: 无法识别订阅格式，内容既不是 YAML 也不是已知的代理 URI 格式");
+                throw new InvalidOperationException(
+                    "无法解析订阅内容。支持的格式: YAML 配置、Base64 编码的 YAML、代理 URI (anytls/ss/trojan/vless 等)。" +
+                    "请检查订阅 URL 是否正确。");
+        }
+
         File.WriteAllText(downloadPath, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         AppendLogLine($"已保存订阅文件: {downloadPath}");
 
@@ -974,7 +998,7 @@ public partial class MainWindow : Window
 
         if (settings.Subscriptions.Any(x => x.Enabled))
         {
-            throw new InvalidOperationException("找不到已下载的订阅配置，请先选择订阅并执行“更新选中订阅”。");
+            throw new InvalidOperationException("找不到已下载的订阅配置，请先选择订阅并执行”添加/更新订阅”。");
         }
 
         return _configBuilder.Build(settings, localProviders);
@@ -1130,29 +1154,54 @@ public partial class MainWindow : Window
     private static string DecodeSubscriptionText(string content)
     {
         var normalized = content.Trim();
-        if (LooksLikeBase64(normalized))
+        if (!LooksLikeBase64(normalized))
         {
-            try
+            return content;
+        }
+
+        try
+        {
+            var cleaned = new string(normalized.Where(c => !char.IsWhiteSpace(c)).ToArray());
+            var remainder = cleaned.Length % 4;
+            if (remainder == 2)
             {
-                return Encoding.UTF8.GetString(Convert.FromBase64String(normalized));
+                cleaned += "==";
             }
-            catch
+            else if (remainder == 3)
+            {
+                cleaned += "=";
+            }
+            else if (remainder == 1)
             {
                 return content;
             }
-        }
 
-        return content;
+            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(cleaned));
+            return decoded.Contains('\0') ? content : decoded;
+        }
+        catch
+        {
+            return content;
+        }
     }
 
     private static bool LooksLikeBase64(string text)
     {
-        if (text.Length < 20 || text.Any(ch => !char.IsLetterOrDigit(ch) && ch != '+' && ch != '/' && ch != '='))
+        if (text.Length < 20)
         {
             return false;
         }
 
-        return text.Length % 4 == 0;
+        foreach (var ch in text)
+        {
+            if (!char.IsLetterOrDigit(ch) && ch != '+' && ch != '/' && ch != '='
+                && ch != '\n' && ch != '\r' && ch != ' ' && ch != '\t')
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private sealed record SubscriptionContentParseResult(List<string> Rules);
@@ -1200,12 +1249,44 @@ public partial class MainWindow : Window
             && value >= 0;
     }
 
+    private void EnsureSingleActiveSubscription()
+    {
+        var enabledSubs = _settings.Subscriptions.Where(x => x.Enabled).ToList();
+        if (enabledSubs.Count <= 1)
+        {
+            return;
+        }
+
+        // Keep the one matching ActiveSubscriptionName, or the first one
+        var keep = enabledSubs.FirstOrDefault(x =>
+            string.Equals(x.Name, _settings.ActiveSubscriptionName, StringComparison.OrdinalIgnoreCase))
+            ?? enabledSubs[0];
+
+        foreach (var sub in _settings.Subscriptions)
+        {
+            sub.Enabled = string.Equals(sub.Name, keep.Name, StringComparison.OrdinalIgnoreCase);
+        }
+
+        _settings.ActiveSubscriptionName = keep.Name;
+    }
+
+    private void DisableOtherSubscriptions(string activeName)
+    {
+        foreach (var sub in _settings.Subscriptions)
+        {
+            if (!string.Equals(sub.Name, activeName, StringComparison.OrdinalIgnoreCase))
+            {
+                sub.Enabled = false;
+            }
+        }
+    }
+
     private void RefreshSubscriptionsList()
     {
         SubscriptionsListBox.ItemsSource = null;
         SubscriptionsListBox.ItemsSource = _settings.Subscriptions
             .Select(x => new SubscriptionRow(
-                x.Enabled ? "启用" : "停用",
+                x.Enabled ? "★ 活动" : "停用",
                 x.Name,
                 FormatBytes(x.UploadBytes + x.DownloadBytes),
                 x.TotalBytes > 0 ? FormatBytes(x.TotalBytes) : "-",

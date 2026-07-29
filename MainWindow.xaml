@@ -22,7 +22,6 @@
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="StartCoreButton" Content="启动/重启内核" Width="105" Margin="8,0,0,0" Click="StartCoreButton_Click" />
                 <Button x:Name="StopCoreButton" Content="停止内核" Width="90" Margin="8,0,0,0" Click="StopCoreButton_Click" />
-                <Button x:Name="SaveAllButton" Content="保存设置并生成配置" Width="150" Margin="8,0,0,0" Click="SaveAllButton_Click" />
             </StackPanel>
         </DockPanel>
 
@@ -72,8 +71,7 @@
                                   IsReadOnly="True"
                                   SelectionMode="Single"
                                   SelectionUnit="FullRow"
-                                  SelectionChanged="SubscriptionsListBox_SelectionChanged"
-                                  MouseDoubleClick="SubscriptionsListBox_MouseDoubleClick">
+                                  SelectionChanged="SubscriptionsListBox_SelectionChanged">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="状态" Binding="{Binding Status}" Width="55" />
                                 <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="*" />
@@ -87,7 +85,6 @@
                     <GroupBox Header="编辑订阅" Grid.Row="1" Margin="0,8,0,0">
                         <Grid Margin="8">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
@@ -107,12 +104,10 @@
                             <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="更新间隔(秒)" />
                             <TextBox x:Name="SubscriptionIntervalTextBox" Grid.Row="2" Grid.Column="1" Margin="8,0,0,8" Text="3600" />
 
-                            <CheckBox x:Name="SubscriptionEnabledCheckBox" Grid.Row="3" Grid.Column="1" Margin="8,0,0,8" Content="启用此订阅" IsChecked="True" />
-
-                            <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Left">
+                            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Left">
                                 <Button Content="新增/更新" Width="90" Click="AddOrUpdateSubscriptionButton_Click" />
-                                <Button Content="删除" Width="70" Margin="8,0,0,0" Click="RemoveSubscriptionButton_Click" />
-                                <Button Content="更新选中订阅" Width="110" Margin="8,0,0,0" Click="UpdateSelectedProviderButton_Click" />
+                                <Button Content="删除订阅" Width="90" Margin="8,0,0,0" Click="RemoveSubscriptionButton_Click" />
+                                <Button Content="激活订阅" Width="90" Margin="8,0,0,0" Click="ActivateSelectedSubscriptionButton_Click" />
                             </StackPanel>
                         </Grid>
                     </GroupBox>

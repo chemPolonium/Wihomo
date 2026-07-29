@@ -399,7 +399,12 @@ public sealed class MihomoApiClient
 
     public async Task<SubscriptionDownloadResult> DownloadSubscriptionAsync(string url, CancellationToken cancellationToken = default)
     {
-        using var client = new HttpClient();
+        using var handler = new SocketsHttpHandler
+        {
+            UseProxy = false,
+            Proxy = null
+        };
+        using var client = new HttpClient(handler);
         using var response = await client.GetAsync(url, cancellationToken);
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync(cancellationToken);

@@ -106,7 +106,23 @@ public sealed class SubscriptionConfigComposer
 
         try
         {
-            return Encoding.UTF8.GetString(Convert.FromBase64String(normalized));
+            var cleaned = new string(normalized.Where(c => !char.IsWhiteSpace(c)).ToArray());
+            var remainder = cleaned.Length % 4;
+            if (remainder == 2)
+            {
+                cleaned += "==";
+            }
+            else if (remainder == 3)
+            {
+                cleaned += "=";
+            }
+            else if (remainder == 1)
+            {
+                return content;
+            }
+
+            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(cleaned));
+            return decoded.Contains('\0') ? content : decoded;
         }
         catch
         {
@@ -162,19 +178,22 @@ public sealed class SubscriptionConfigComposer
             }
 
             var operation = ParseOverrideKey(rawKey);
-            var targetKey = new YamlScalarNode(operation.Key);
+            var existingKeyNode = FindKeyNode(target, operation.Key);
 
             if (operation.SequenceMode != SequenceMergeMode.Replace
-                && target.Children.TryGetValue(targetKey, out var existingSequenceNode)
+                && existingKeyNode is not null
+                && target.Children.TryGetValue(existingKeyNode, out var existingSequenceNode)
                 && existingSequenceNode is YamlSequenceNode existingSequence
                 && pair.Value is YamlSequenceNode overlaySequence)
             {
-                target.Children[targetKey] = MergeSequences(existingSequence, overlaySequence, operation.SequenceMode);
+                target.Children.Remove(existingKeyNode);
+                target.Children[new YamlScalarNode(operation.Key)] = MergeSequences(existingSequence, overlaySequence, operation.SequenceMode);
                 continue;
             }
 
             if (!operation.ForceReplace
-                && target.Children.TryGetValue(targetKey, out var existingNode)
+                && existingKeyNode is not null
+                && target.Children.TryGetValue(existingKeyNode, out var existingNode)
                 && existingNode is YamlMappingNode existingMap
                 && pair.Value is YamlMappingNode overlayMap)
             {
@@ -182,7 +201,13 @@ public sealed class SubscriptionConfigComposer
                 continue;
             }
 
-            target.Children[targetKey] = pair.Value;
+            // Remove existing key first to avoid duplicate keys
+            if (existingKeyNode is not null)
+            {
+                target.Children.Remove(existingKeyNode);
+            }
+
+            target.Children[new YamlScalarNode(operation.Key)] = pair.Value;
         }
     }
 
@@ -260,12 +285,21 @@ public sealed class SubscriptionConfigComposer
 
     private static bool LooksLikeBase64(string text)
     {
-        if (text.Length < 20 || text.Any(ch => !char.IsLetterOrDigit(ch) && ch != '+' && ch != '/' && ch != '='))
+        if (text.Length < 20)
         {
             return false;
         }
 
-        return text.Length % 4 == 0;
+        foreach (var ch in text)
+        {
+            if (!char.IsLetterOrDigit(ch) && ch != '+' && ch != '/' && ch != '='
+                && ch != '\n' && ch != '\r' && ch != ' ' && ch != '\t')
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool HasAnyGeoxUrl(GeoxUrlSettings geox)
@@ -278,12 +312,15 @@ public sealed class SubscriptionConfigComposer
 
     private static YamlMappingNode GetOrCreateMap(YamlMappingNode parent, string key)
     {
-        var keyNode = new YamlScalarNode(key);
-        if (parent.Children.TryGetValue(keyNode, out var child) && child is YamlMappingNode existingMap)
+        var existingKey = FindKeyNode(parent, key);
+        if (existingKey is not null
+            && parent.Children.TryGetValue(existingKey, out var child)
+            && child is YamlMappingNode existingMap)
         {
             return existingMap;
         }
 
+        var keyNode = new YamlScalarNode(key);
         var created = new YamlMappingNode();
         parent.Children[keyNode] = created;
         return created;
@@ -291,7 +328,29 @@ public sealed class SubscriptionConfigComposer
 
     private static void SetScalar(YamlMappingNode node, string key, string value)
     {
+        // YamlMappingNode uses reference equality for keys.
+        // Must find and remove existing key node first to avoid duplicate keys.
+        var existingKey = FindKeyNode(node, key);
+        if (existingKey is not null)
+        {
+            node.Children.Remove(existingKey);
+        }
+
         node.Children[new YamlScalarNode(key)] = new YamlScalarNode(value);
+    }
+
+    private static YamlScalarNode? FindKeyNode(YamlMappingNode node, string key)
+    {
+        foreach (var child in node.Children)
+        {
+            if (child.Key is YamlScalarNode scalar
+                && string.Equals(scalar.Value, key, StringComparison.Ordinal))
+            {
+                return scalar;
+            }
+        }
+
+        return null;
     }
 
     private static string NormalizeTunStack(string value)
