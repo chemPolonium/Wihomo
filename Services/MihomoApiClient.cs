@@ -9,15 +9,27 @@ namespace Wihomo.Services;
 
 public sealed class MihomoApiClient
 {
-    private HttpClient _httpClient = new();
+    private HttpClient _httpClient = CreateNoProxyClient();
     private readonly Dictionary<string, ConnectionTrafficSnapshot> _connectionTrafficSnapshots = new(StringComparer.Ordinal);
+
+    private static HttpClient CreateNoProxyClient()
+    {
+        var handler = new SocketsHttpHandler { UseProxy = false, Proxy = null };
+        return new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
+    }
 
     public void Configure(string host, int port, string secret)
     {
         _httpClient.Dispose();
-        _httpClient = new HttpClient
+        var handler = new SocketsHttpHandler
         {
-            BaseAddress = new Uri($"http://{host}:{port}/")
+            UseProxy = false,
+            Proxy = null
+        };
+        _httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri($"http://{host}:{port}/"),
+            Timeout = TimeSpan.FromSeconds(10)
         };
 
         if (!string.IsNullOrWhiteSpace(secret))
@@ -31,6 +43,17 @@ public sealed class MihomoApiClient
     {
         var result = await _httpClient.GetFromJsonAsync<MihomoVersionResponse>("version", cancellationToken);
         return result?.Version ?? "unknown";
+    }
+
+    public async Task ReloadConfigsAsync(string configPath, CancellationToken cancellationToken = default)
+    {
+        var payload = JsonSerializer.Serialize(new { path = configPath });
+        var request = new HttpRequestMessage(HttpMethod.Put, "configs?force=true")
+        {
+            Content = new StringContent(payload, Encoding.UTF8, "application/json")
+        };
+        var response = await _httpClient.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
     }
 
     public async Task<ConnectionStats> GetConnectionStatsAsync(

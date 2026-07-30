@@ -171,6 +171,93 @@ public partial class MainWindow : Window
         await ExecuteUiActionAsync(() => SaveSettingsAsync(generateConfig: true));
     }
 
+    private async void ManualUpdateGeoDataButton_Click(object sender, RoutedEventArgs e)
+    {
+        await ExecuteUiActionAsync(async () =>
+        {
+            var workingDir = _settings.Core.WorkingDirectory;
+            if (string.IsNullOrWhiteSpace(workingDir))
+            {
+                throw new InvalidOperationException("请先在内核设置中配置工作目录。");
+            }
+
+            Directory.CreateDirectory(workingDir);
+
+            var downloads = new (string url, string fileName)[]
+            {
+                (GeoIpUrlTextBox.Text.Trim(), "geoip.dat"),
+                (GeoSiteUrlTextBox.Text.Trim(), "geosite.dat"),
+                (MmdbUrlTextBox.Text.Trim(), "country.mmdb"),
+                (AsnUrlTextBox.Text.Trim(), "GeoLite2-ASN.mmdb")
+            };
+
+            using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+
+            var downloaded = new List<(string tempPath, string fileName)>();
+            foreach (var (url, fileName) in downloads)
+            {
+                if (string.IsNullOrWhiteSpace(url))
+                {
+                    continue;
+                }
+
+                if (!Uri.TryCreate(url, UriKind.Absolute, out _))
+                {
+                    AppendLogLine($"跳过 {fileName}: URL 无效");
+                    continue;
+                }
+
+                var tempPath = Path.Combine(workingDir, $"{fileName}.tmp");
+                AppendLogLine($"正在下载 {fileName}: {url}");
+                try
+                {
+                    var data = await client.GetByteArrayAsync(url);
+                    await File.WriteAllBytesAsync(tempPath, data);
+                    downloaded.Add((tempPath, fileName));
+                    AppendLogLine($"已下载 {fileName} ({data.Length} 字节)");
+                }
+                catch (Exception ex)
+                {
+                    AppendLogLine($"下载 {fileName} 失败: {ex.Message}");
+                    try { File.Delete(tempPath); } catch { }
+                }
+            }
+
+            if (downloaded.Count == 0)
+            {
+                throw new InvalidOperationException("未成功下载任何 GEO 数据文件。");
+            }
+
+            var wasRunning = _processManager.IsRunning;
+            if (wasRunning)
+            {
+                _statsTimer.Stop();
+                _connectionsTimer.Stop();
+                if (_settings.Core.EnableSystemProxy)
+                {
+                    _systemProxyService.Disable();
+                }
+                _processManager.Stop();
+                AppendLogLine("内核已停止，正在替换 GEO 数据文件...");
+            }
+
+            foreach (var (tempPath, fileName) in downloaded)
+            {
+                var destPath = Path.Combine(workingDir, fileName);
+                File.Move(tempPath, destPath, overwrite: true);
+                AppendLogLine($"已替换 {fileName}");
+            }
+
+            if (wasRunning)
+            {
+                AppendLogLine("正在重启内核...");
+                await StartCoreAsync();
+            }
+
+            SetMessage($"已更新 {downloaded.Count} 个 GEO 数据文件。");
+        });
+    }
+
     private async Task SaveSettingsAsync(bool generateConfig)
     {
         var collected = CollectSettingsFromUi();
@@ -221,9 +308,9 @@ public partial class MainWindow : Window
         });
     }
 
-    private void AddOrUpdateSubscriptionButton_Click(object sender, RoutedEventArgs e)
+    private async void AddOrUpdateSubscriptionButton_Click(object sender, RoutedEventArgs e)
     {
-        ExecuteUiAction(() =>
+        await ExecuteUiActionAsync(async () =>
         {
             var name = SubscriptionNameTextBox.Text.Trim();
             var url = SubscriptionUrlTextBox.Text.Trim();
@@ -240,6 +327,7 @@ public partial class MainWindow : Window
             }
 
             var existing = _settings.Subscriptions.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+            bool isActive;
             if (existing is null)
             {
                 _settings.Subscriptions.Add(new SubscriptionItem
@@ -249,18 +337,38 @@ public partial class MainWindow : Window
                     IntervalSeconds = interval,
                     Enabled = false
                 });
-
+                isActive = false;
                 SetMessage("已新增订阅。");
             }
             else
             {
                 existing.Url = url;
                 existing.IntervalSeconds = interval;
-
+                isActive = existing.Enabled;
                 SetMessage("已更新订阅。");
             }
 
+            await _settingsService.SaveAsync(_settings);
             RefreshSubscriptionsList();
+
+            var subscription = _settings.Subscriptions.First(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+            await DownloadAndSaveSubscriptionAsync(subscription);
+
+            if (isActive)
+            {
+                var subscriptionFile = GetSubscriptionFilePath(name);
+                var activeFile = GetActiveSubscriptionPath(_settings);
+                File.Copy(subscriptionFile, activeFile, overwrite: true);
+
+                if (_processManager.IsRunning)
+                {
+                    _processManager.Stop();
+                    AppendLogLine("内核已停止，准备使用新订阅文件重启。");
+                }
+
+                await StartCoreAsync(new HashSet<string> { MihomoConfigBuilder.NormalizeName(name) });
+                SetMessage("已下载订阅文件并已重载内核。");
+            }
         });
     }
 
@@ -305,8 +413,12 @@ public partial class MainWindow : Window
         }
 
         var selected = _settings.Subscriptions[SubscriptionsListBox.SelectedIndex];
+        var subscriptionFile = GetSubscriptionFilePath(selected.Name);
+        if (!File.Exists(subscriptionFile))
+        {
+            throw new InvalidOperationException($"找不到订阅文件，请先通过「新增/更新」下载订阅: {selected.Name}");
+        }
 
-        // Activate this subscription and disable all others
         DisableOtherSubscriptions(selected.Name);
         selected.Enabled = true;
         _settings.ActiveSubscriptionName = selected.Name;
@@ -314,8 +426,22 @@ public partial class MainWindow : Window
         RefreshSubscriptionsList();
         AppendLogLine($"已激活订阅: {selected.Name}");
 
+        var activeFile = GetActiveSubscriptionPath(_settings);
+        File.Copy(subscriptionFile, activeFile, overwrite: true);
+
+        var content = File.ReadAllText(subscriptionFile, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        ParseSubscriptionRules(content);
+        RefreshSubscriptionRulesView();
+
+        if (_processManager.IsRunning)
+        {
+            _processManager.Stop();
+            AppendLogLine("内核已停止，准备使用新订阅重启。");
+        }
+
         var providerKey = MihomoConfigBuilder.NormalizeName(selected.Name);
-        await DownloadSubscriptionAndReloadAsync(selected, providerKey);
+        await StartCoreAsync(new HashSet<string> { providerKey });
+        SetMessage($"已激活订阅: {selected.Name}");
     }
 
     private async void RefreshProxyGroupsButton_Click(object sender, RoutedEventArgs e)
@@ -468,27 +594,37 @@ public partial class MainWindow : Window
 
     private async void StatsTimer_Tick(object? sender, EventArgs e)
     {
-        await ExecuteUiActionAsync(async () =>
+        if (!_processManager.IsRunning)
         {
-            if (!_processManager.IsRunning)
-            {
-                RefreshRulesAndConnectionsViewWithoutCore();
-                return;
-            }
+            RefreshRulesAndConnectionsViewWithoutCore();
+            return;
+        }
 
+        try
+        {
             await RefreshStatsAsync();
-        });
+        }
+        catch
+        {
+            // Silently ignore transient failures for periodic refresh
+        }
     }
 
     private async void ConnectionsTimer_Tick(object? sender, EventArgs e)
     {
-        await ExecuteUiActionAsync(async () =>
+        if (!_processManager.IsRunning)
         {
-            if (_processManager.IsRunning)
-            {
-                await RefreshConnectionsAsync();
-            }
-        });
+            return;
+        }
+
+        try
+        {
+            await RefreshConnectionsAsync();
+        }
+        catch
+        {
+            // Silently ignore transient failures for periodic refresh
+        }
     }
 
     private void ProcessManager_OutputReceived(string line)
@@ -879,10 +1015,49 @@ public partial class MainWindow : Window
 
         SetCoreStatus("启动中");
         AppendLogLine("正在启动 mihomo 内核...");
-        await Task.Delay(900);
-        var version = await _apiClient.GetVersionAsync();
+
+        string version = "unknown";
+        bool apiReady = false;
+        for (int i = 0; i < 10; i++)
+        {
+            await Task.Delay(500);
+            try
+            {
+                version = await _apiClient.GetVersionAsync();
+                apiReady = true;
+                AppendLogLine($"API 已就绪，尝试次数: {i + 1}");
+                break;
+            }
+            catch (Exception ex) when (i < 9)
+            {
+                AppendLogLine($"等待 API 就绪 ({i + 1}/10): {ex.GetType().Name}");
+                continue;
+            }
+        }
+
+        if (!apiReady)
+        {
+            _processManager.Stop();
+            SetCoreStatus("已停止");
+            throw new InvalidOperationException("内核启动失败: API 无响应");
+        }
+
         VersionTextBlock.Text = $"内核版本: {version}";
         SetCoreStatus("运行中");
+
+        if (_settings.GeoAutoUpdate)
+        {
+            try
+            {
+                AppendLogLine("正在触发 GEO 数据自动更新...");
+                var reloadConfigPath = Path.Combine(_settings.Core.WorkingDirectory, "config.yaml");
+                await _apiClient.ReloadConfigsAsync(reloadConfigPath);
+            }
+            catch (Exception ex)
+            {
+                AppendLogLine($"触发 GEO 更新失败: {ex.Message}");
+            }
+        }
 
         if (_settings.Core.EnableSystemProxy)
         {
@@ -923,16 +1098,15 @@ public partial class MainWindow : Window
         await StartCoreAsync();
     }
 
-    private async Task DownloadSubscriptionAndReloadAsync(SubscriptionItem subscription, string providerKey)
+    private async Task DownloadAndSaveSubscriptionAsync(SubscriptionItem subscription)
     {
-        var downloadPath = Path.Combine(_settings.Core.WorkingDirectory, "subscriptions", "active.yaml");
+        var downloadPath = GetSubscriptionFilePath(subscription.Name);
         Directory.CreateDirectory(Path.GetDirectoryName(downloadPath)!);
 
         AppendLogLine($"正在下载订阅文件: {subscription.Url}");
         var download = await _apiClient.DownloadSubscriptionAsync(subscription.Url);
         var rawContent = download.Content;
 
-        // Detect format and convert if needed (e.g. base64-encoded anytls URIs -> YAML)
         var convertResult = _formatConverter.Convert(rawContent);
         var content = convertResult.Content;
 
@@ -956,19 +1130,8 @@ public partial class MainWindow : Window
 
         ApplySubscriptionUsage(subscription, download.UserInfo);
         RefreshSubscriptionsList();
-        _settings.ActiveSubscriptionName = subscription.Name;
         ParseSubscriptionRules(content);
         RefreshSubscriptionRulesView();
-
-        var localProviders = new HashSet<string> { providerKey };
-        if (_processManager.IsRunning)
-        {
-            _processManager.Stop();
-            AppendLogLine("内核已停止，准备使用新订阅文件重启。" );
-        }
-
-        await StartCoreAsync(localProviders);
-        SetMessage("已下载订阅文件并已重载内核。" );
     }
 
     private string WriteMihomoConfigFile(AppSettings settings, HashSet<string>? localProviders = null)
@@ -993,6 +1156,7 @@ public partial class MainWindow : Window
             }
 
             var subscriptionText = File.ReadAllText(subscriptionTemplatePath, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            AppendLogLine($"使用订阅文件: {subscriptionTemplatePath} ({subscriptionText.Length} 字符)");
             return _subscriptionConfigComposer.Compose(subscriptionText, settings);
         }
 
@@ -1007,6 +1171,12 @@ public partial class MainWindow : Window
     private static string GetActiveSubscriptionPath(AppSettings settings)
     {
         return Path.Combine(settings.Core.WorkingDirectory, "subscriptions", "active.yaml");
+    }
+
+    private string GetSubscriptionFilePath(string subscriptionName)
+    {
+        return Path.Combine(_settings.Core.WorkingDirectory, "subscriptions",
+            $"{MihomoConfigBuilder.NormalizeName(subscriptionName)}.yaml");
     }
 
     private static string? GetSubscriptionTemplatePath(AppSettings settings)
@@ -1053,6 +1223,17 @@ public partial class MainWindow : Window
             if (!File.Exists(destinationPath))
             {
                 File.Copy(sourcePath, destinationPath, overwrite: false);
+            }
+        }
+
+        // Log GEO file timestamps
+        foreach (var fileName in new[] { "geoip.dat", "geosite.dat", "country.mmdb", "GeoLite2-ASN.mmdb" })
+        {
+            var filePath = Path.Combine(workingDirectory, fileName);
+            if (File.Exists(filePath))
+            {
+                var lastWrite = File.GetLastWriteTime(filePath);
+                AppendLogLine($"GEO 数据 {fileName}: 更新于 {lastWrite:yyyy-MM-dd HH:mm:ss}");
             }
         }
     }

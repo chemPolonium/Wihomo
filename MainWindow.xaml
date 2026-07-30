@@ -160,8 +160,12 @@
                             <TextBox x:Name="GeoUpdateIntervalTextBox" Width="80" Margin="8,0,0,0" />
                         </StackPanel>
 
-                        <Button Grid.Row="7" Grid.Column="1" Width="190" HorizontalAlignment="Left" Margin="8,12,0,0"
-                                Content="保存外部资源设置并生成配置" Click="SaveAllButton_Click" />
+                        <StackPanel Grid.Row="7" Grid.Column="1" Orientation="Horizontal" Margin="8,12,0,0">
+                            <Button Width="190" HorizontalAlignment="Left"
+                                    Content="保存外部资源设置并生成配置" Click="SaveAllButton_Click" />
+                            <Button Width="140" HorizontalAlignment="Left" Margin="12,0,0,0"
+                                    Content="手动更新 GEO 数据" Click="ManualUpdateGeoDataButton_Click" />
+                        </StackPanel>
                     </Grid>
                 </ScrollViewer>
             </TabItem>
