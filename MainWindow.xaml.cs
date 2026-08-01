@@ -93,6 +93,16 @@ public partial class MainWindow : Window
         _processManager.Stop();
     }
 
+    protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Key == System.Windows.Input.Key.Escape)
+        {
+            HideToNotificationArea();
+            e.Handled = true;
+        }
+    }
+
     private static Drawing.Icon LoadApplicationIcon()
     {
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Wihomo.ico");
