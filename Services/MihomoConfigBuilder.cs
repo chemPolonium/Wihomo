@@ -38,6 +38,73 @@ public sealed class MihomoConfigBuilder
         sb.AppendLine("  auto-detect-interface: true");
         sb.AppendLine("  strict-route: true");
         sb.AppendLine();
+
+        if (settings.Dns.Enable)
+        {
+            sb.AppendLine("dns:");
+            sb.AppendLine($"  enable: true");
+            sb.AppendLine($"  listen: \"{settings.Dns.Listen}\"");
+            sb.AppendLine($"  ipv6: {settings.Dns.Ipv6.ToString().ToLowerInvariant()}");
+            sb.AppendLine($"  enhanced-mode: {settings.Dns.EnhancedMode}");
+            sb.AppendLine($"  fake-ip-range: {settings.Dns.FakeIpRange}");
+            sb.AppendLine("  respect-rules: true");
+            sb.AppendLine("  proxy-server-nameserver:");
+            sb.AppendLine("    - 1.1.1.1");
+            sb.AppendLine("    - 8.8.8.8");
+
+            if (settings.Dns.FakeIpFilter.Count > 0)
+            {
+                sb.AppendLine("  fake-ip-filter:");
+                foreach (var filter in settings.Dns.FakeIpFilter)
+                {
+                    sb.AppendLine($"    - \"{filter}\"");
+                }
+            }
+
+            if (settings.Dns.DefaultNameserver.Count > 0)
+            {
+                sb.AppendLine("  default-nameserver:");
+                foreach (var ns in settings.Dns.DefaultNameserver)
+                {
+                    sb.AppendLine($"    - {ns}");
+                }
+            }
+
+            if (settings.Dns.Nameserver.Count > 0)
+            {
+                sb.AppendLine("  nameserver:");
+                foreach (var ns in settings.Dns.Nameserver)
+                {
+                    sb.AppendLine($"    - \"{ns}\"");
+                }
+            }
+
+            if (settings.Dns.Fallback.Count > 0)
+            {
+                sb.AppendLine("  fallback:");
+                foreach (var ns in settings.Dns.Fallback)
+                {
+                    sb.AppendLine($"    - \"{ns}\"");
+                }
+            }
+
+            if (settings.Dns.FallbackFilterGeoIp || settings.Dns.FallbackFilterIpCidr.Count > 0)
+            {
+                sb.AppendLine("  fallback-filter:");
+                sb.AppendLine($"    geoip: {settings.Dns.FallbackFilterGeoIp.ToString().ToLowerInvariant()}");
+                sb.AppendLine($"    geoip-code: {settings.Dns.FallbackFilterGeoIpCode}");
+                if (settings.Dns.FallbackFilterIpCidr.Count > 0)
+                {
+                    sb.AppendLine("    ipcidr:");
+                    foreach (var cidr in settings.Dns.FallbackFilterIpCidr)
+                    {
+                        sb.AppendLine($"      - {cidr}");
+                    }
+                }
+            }
+            sb.AppendLine();
+        }
+
         sb.AppendLine($"geodata-mode: {settings.GeoDataMode.ToString().ToLowerInvariant()}");
         sb.AppendLine($"geo-auto-update: {settings.GeoAutoUpdate.ToString().ToLowerInvariant()}");
         sb.AppendLine($"geo-update-interval: {Math.Max(settings.GeoUpdateIntervalHours, 1)}");

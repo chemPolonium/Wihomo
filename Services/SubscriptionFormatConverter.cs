@@ -305,7 +305,8 @@ public sealed class SubscriptionFormatConverter
             ["name"] = !string.IsNullOrWhiteSpace(name) ? name : $"AnyTLS-{index + 1}",
             ["type"] = "anytls",
             ["udp"] = true,
-            ["client-fingerprint"] = "chrome"
+            ["client-fingerprint"] = "chrome",
+            ["skip-cert-verify"] = true
         };
 
         // Check if it's the query-param style: host:port?password=xxx
@@ -515,6 +516,7 @@ public sealed class SubscriptionFormatConverter
             ["type"] = proxyType,
             ["server"] = host,
             ["port"] = port,
+            ["skip-cert-verify"] = true
         };
 
         if (proxyType is "trojan" or "vless" or "tuic")

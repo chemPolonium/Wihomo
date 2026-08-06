@@ -114,62 +114,6 @@
                 </Grid>
             </TabItem>
 
-            <TabItem Header="外部资源">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <Grid Margin="8">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="140" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock Grid.ColumnSpan="2" TextWrapping="Wrap"
-                                   Text="由 mihomo 负责下载和自动更新 GEO 数据库；此页面仅配置下载地址与更新策略。" />
-
-                        <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="GeoIP 数据库" />
-                        <TextBox x:Name="GeoIpUrlTextBox" Grid.Row="1" Grid.Column="1" Margin="8,8,0,0" />
-
-                        <TextBlock Grid.Row="2" VerticalAlignment="Center" Text="GeoSite 数据库" />
-                        <TextBox x:Name="GeoSiteUrlTextBox" Grid.Row="2" Grid.Column="1" Margin="8,8,0,0" />
-
-                        <TextBlock Grid.Row="3" VerticalAlignment="Center" Text="MMDB 数据库" />
-                        <TextBox x:Name="MmdbUrlTextBox" Grid.Row="3" Grid.Column="1" Margin="8,8,0,0" />
-
-                        <TextBlock Grid.Row="4" VerticalAlignment="Center" Text="ASN 数据库" />
-                        <TextBox x:Name="AsnUrlTextBox" Grid.Row="4" Grid.Column="1" Margin="8,8,0,0" />
-
-                        <TextBlock Grid.Row="5" VerticalAlignment="Center" Text="Geodata 数据模式" />
-                        <ComboBox x:Name="GeoDataModeComboBox" Grid.Row="5" Grid.Column="1" Width="180"
-                                  HorizontalAlignment="Left" Margin="8,8,0,0">
-                            <ComboBoxItem Content="MMDB（默认）" />
-                            <ComboBoxItem Content="DAT" />
-                        </ComboBox>
-
-                        <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Margin="8,8,0,0">
-                            <CheckBox x:Name="GeoAutoUpdateCheckBox" Content="自动更新 GEO 数据" VerticalAlignment="Center" />
-                            <TextBlock Margin="16,0,0,0" VerticalAlignment="Center" Text="更新间隔（小时）" />
-                            <TextBox x:Name="GeoUpdateIntervalTextBox" Width="80" Margin="8,0,0,0" />
-                        </StackPanel>
-
-                        <StackPanel Grid.Row="7" Grid.Column="1" Orientation="Horizontal" Margin="8,12,0,0">
-                            <Button Width="190" HorizontalAlignment="Left"
-                                    Content="保存外部资源设置并生成配置" Click="SaveAllButton_Click" />
-                            <Button Width="140" HorizontalAlignment="Left" Margin="12,0,0,0"
-                                    Content="手动更新 GEO 数据" Click="ManualUpdateGeoDataButton_Click" />
-                        </StackPanel>
-                    </Grid>
-                </ScrollViewer>
-            </TabItem>
-
             <TabItem Header="代理组">
                 <Grid Margin="8">
                     <Grid.RowDefinitions>
@@ -231,22 +175,6 @@
                             </Grid>
                         </GroupBox>
                     </Grid>
-                </Grid>
-            </TabItem>
-
-            <TabItem Header="YAML 覆写">
-                <Grid Margin="8">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-                    <TextBlock Text="对订阅配置进行 YAML 深度合并。key! 强制整体覆盖对象；+key 前置数组；key+ 追加数组。" />
-                    <TextBox x:Name="RuleOverridesTextBox" Grid.Row="1" Margin="0,8,0,0"
-                             AcceptsReturn="True" AcceptsTab="True"
-                             FontFamily="Consolas"
-                             VerticalScrollBarVisibility="Auto"
-                             HorizontalScrollBarVisibility="Auto"
-                             TextWrapping="NoWrap" />
                 </Grid>
             </TabItem>
 
@@ -315,6 +243,78 @@
                             VerticalScrollBarVisibility="Auto"
                             HorizontalScrollBarVisibility="Auto" />
                </Grid>
+            </TabItem>
+
+            <TabItem Header="外部资源">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Grid Margin="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.ColumnSpan="2" TextWrapping="Wrap"
+                                   Text="由 mihomo 负责下载和自动更新 GEO 数据库；此页面仅配置下载地址与更新策略。" />
+
+                        <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="GeoIP 数据库" />
+                        <TextBox x:Name="GeoIpUrlTextBox" Grid.Row="1" Grid.Column="1" Margin="8,8,0,0" />
+
+                        <TextBlock Grid.Row="2" VerticalAlignment="Center" Text="GeoSite 数据库" />
+                        <TextBox x:Name="GeoSiteUrlTextBox" Grid.Row="2" Grid.Column="1" Margin="8,8,0,0" />
+
+                        <TextBlock Grid.Row="3" VerticalAlignment="Center" Text="MMDB 数据库" />
+                        <TextBox x:Name="MmdbUrlTextBox" Grid.Row="3" Grid.Column="1" Margin="8,8,0,0" />
+
+                        <TextBlock Grid.Row="4" VerticalAlignment="Center" Text="ASN 数据库" />
+                        <TextBox x:Name="AsnUrlTextBox" Grid.Row="4" Grid.Column="1" Margin="8,8,0,0" />
+
+                        <TextBlock Grid.Row="5" VerticalAlignment="Center" Text="Geodata 数据模式" />
+                        <ComboBox x:Name="GeoDataModeComboBox" Grid.Row="5" Grid.Column="1" Width="180"
+                                  HorizontalAlignment="Left" Margin="8,8,0,0">
+                            <ComboBoxItem Content="MMDB（默认）" />
+                            <ComboBoxItem Content="DAT" />
+                        </ComboBox>
+
+                        <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Margin="8,8,0,0">
+                            <CheckBox x:Name="GeoAutoUpdateCheckBox" Content="自动更新 GEO 数据" VerticalAlignment="Center" />
+                            <TextBlock Margin="16,0,0,0" VerticalAlignment="Center" Text="更新间隔（小时）" />
+                            <TextBox x:Name="GeoUpdateIntervalTextBox" Width="80" Margin="8,0,0,0" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="7" Grid.Column="1" Orientation="Horizontal" Margin="8,12,0,0">
+                            <Button Width="190" HorizontalAlignment="Left"
+                                    Content="保存外部资源设置并生成配置" Click="SaveAllButton_Click" />
+                            <Button Width="140" HorizontalAlignment="Left" Margin="12,0,0,0"
+                                    Content="手动更新 GEO 数据" Click="ManualUpdateGeoDataButton_Click" />
+                        </StackPanel>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="YAML 覆写">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="对订阅配置进行 YAML 深度合并。key! 强制整体覆盖对象；+key 前置数组；key+ 追加数组。" />
+                    <TextBox x:Name="RuleOverridesTextBox" Grid.Row="1" Margin="0,8,0,0"
+                             AcceptsReturn="True" AcceptsTab="True"
+                             FontFamily="Consolas"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto"
+                             TextWrapping="NoWrap" />
+                </Grid>
             </TabItem>
 
             <TabItem Header="内核设置">
@@ -386,6 +386,59 @@
 
                         <Button Grid.Row="13" Grid.Column="1" Width="130" HorizontalAlignment="Left" Content="保存设置"
                                 Click="SaveSettingsOnlyButton_Click" />
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="DNS 设置">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Grid Margin="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,8"
+                                   TextWrapping="Wrap"
+                                   Text="配置 mihomo 的 DNS 解析行为。启用后将使用 fake-ip 模式防止 DNS 污染，并通过 fallback 机制确保国内外域名正确解析。" />
+
+                        <CheckBox x:Name="EnableDnsCheckBox" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,8" Content="启用 DNS" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="DNS 监听地址" />
+                        <TextBox x:Name="DnsListenTextBox" Grid.Row="2" Grid.Column="1" Margin="8,0,0,8" />
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="增强模式" />
+                        <ComboBox x:Name="DnsEnhancedModeComboBox" Grid.Row="3" Grid.Column="1" Margin="8,0,0,8" SelectedIndex="0">
+                            <ComboBoxItem Content="fake-ip" />
+                            <ComboBoxItem Content="redir-host" />
+                            <ComboBoxItem Content="normal" />
+                        </ComboBox>
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Top" Margin="0,4,0,0" Text="默认 DNS (用于解析 DoH 域名，每行一个)" />
+                        <TextBox x:Name="DefaultNameserverTextBox" Grid.Row="4" Grid.Column="1" Margin="8,0,0,8" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
+
+                        <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Top" Margin="0,4,0,0" Text="Nameserver (国内 DNS，每行一个)" />
+                        <TextBox x:Name="NameserverTextBox" Grid.Row="5" Grid.Column="1" Margin="8,0,0,8" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
+
+                        <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Top" Margin="0,4,0,0" Text="Fallback (海外 DNS，每行一个)" />
+                        <TextBox x:Name="FallbackTextBox" Grid.Row="6" Grid.Column="1" Margin="8,0,0,8" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
+
+                        <StackPanel Grid.Row="7" Grid.Column="1" Orientation="Horizontal" Margin="8,8,0,8">
+                            <Button Width="130" HorizontalAlignment="Left" Content="保存设置"
+                                    Click="SaveSettingsOnlyButton_Click" />
+                            <TextBlock Margin="16,0,0,0" VerticalAlignment="Center" Foreground="Gray"
+                                       Text="修改后需重启内核生效" />
+                        </StackPanel>
                     </Grid>
                 </ScrollViewer>
             </TabItem>

@@ -919,6 +919,12 @@ public partial class MainWindow : Window
         EnableTunCheckBox.IsChecked = _settings.Core.EnableTun;
         StartCoreOnProgramStartCheckBox.IsChecked = _settings.StartCoreOnProgramStart;
         StartWithWindowsCheckBox.IsChecked = _settings.StartWithWindows;
+        EnableDnsCheckBox.IsChecked = _settings.Dns.Enable;
+        DnsListenTextBox.Text = _settings.Dns.Listen;
+        SelectDnsEnhancedMode(_settings.Dns.EnhancedMode);
+        DefaultNameserverTextBox.Text = string.Join(Environment.NewLine, _settings.Dns.DefaultNameserver);
+        NameserverTextBox.Text = string.Join(Environment.NewLine, _settings.Dns.Nameserver);
+        FallbackTextBox.Text = string.Join(Environment.NewLine, _settings.Dns.Fallback);
         GeoIpUrlTextBox.Text = _settings.GeoxUrls.GeoIp;
         GeoSiteUrlTextBox.Text = _settings.GeoxUrls.GeoSite;
         MmdbUrlTextBox.Text = _settings.GeoxUrls.Mmdb;
@@ -993,6 +999,29 @@ public partial class MainWindow : Window
                 GeoSite = ParseAbsoluteUrl(GeoSiteUrlTextBox.Text, "GeoSite 数据库 URL"),
                 Mmdb = ParseAbsoluteUrl(MmdbUrlTextBox.Text, "MMDB 数据库 URL"),
                 Asn = ParseAbsoluteUrl(AsnUrlTextBox.Text, "ASN 数据库 URL")
+            },
+            Dns = new DnsSettings
+            {
+                Enable = EnableDnsCheckBox.IsChecked ?? true,
+                Listen = DnsListenTextBox.Text.Trim(),
+                Ipv6 = true,
+                EnhancedMode = GetSelectedDnsEnhancedMode(),
+                FakeIpRange = "198.18.0.1/16",
+                FakeIpFilter =
+                [
+                    "*.lan",
+                    "*.local",
+                    "*.localhost",
+                    "dns.msftncsi.com",
+                    "www.msftncsi.com",
+                    "www.msftconnecttest.com"
+                ],
+                DefaultNameserver = ParseMultilineText(DefaultNameserverTextBox.Text),
+                Nameserver = ParseMultilineText(NameserverTextBox.Text),
+                Fallback = ParseMultilineText(FallbackTextBox.Text),
+                FallbackFilterGeoIp = true,
+                FallbackFilterGeoIpCode = "CN",
+                FallbackFilterIpCidr = ["240.0.0.0/4"]
             },
             Subscriptions = _settings.Subscriptions
                 .Select(x => new SubscriptionItem
@@ -1574,6 +1603,48 @@ public partial class MainWindow : Window
             "gvisor" => "gvisor",
             _ => "mixed"
         };
+    }
+
+    private void SelectDnsEnhancedMode(string mode)
+    {
+        var normalized = mode switch
+        {
+            "fake-ip" => "fake-ip",
+            "redir-host" => "redir-host",
+            "normal" => "normal",
+            _ => "fake-ip"
+        };
+
+        for (var i = 0; i < DnsEnhancedModeComboBox.Items.Count; i++)
+        {
+            if (DnsEnhancedModeComboBox.Items[i] is ComboBoxItem item
+                && string.Equals(item.Content?.ToString(), normalized, StringComparison.Ordinal))
+            {
+                DnsEnhancedModeComboBox.SelectedIndex = i;
+                return;
+            }
+        }
+
+        DnsEnhancedModeComboBox.SelectedIndex = 0;
+    }
+
+    private string GetSelectedDnsEnhancedMode()
+    {
+        if (DnsEnhancedModeComboBox.SelectedItem is ComboBoxItem item && item.Content is string value && !string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        return "fake-ip";
+    }
+
+    private static List<string> ParseMultilineText(string text)
+    {
+        return text
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => x.Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToList();
     }
 
     private void SelectGeoDataMode(bool useDat)

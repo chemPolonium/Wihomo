@@ -46,6 +46,7 @@ public sealed class SubscriptionConfigComposer
     public string Compose(string subscriptionContent, AppSettings settings)
     {
         var root = LoadRoot(subscriptionContent);
+        SetSkipCertVerifyForAllProxies(root);
         ApplyYamlOverride(root, settings.RuleOverrides);
         var stream = new YamlStream(new YamlDocument(root));
 
@@ -65,6 +66,91 @@ public sealed class SubscriptionConfigComposer
         SetScalar(tun, "auto-route", "true");
         SetScalar(tun, "auto-detect-interface", "true");
         SetScalar(tun, "strict-route", "true");
+
+        if (settings.Dns.Enable)
+        {
+            var dns = GetOrCreateMap(root, "dns");
+            SetScalar(dns, "enable", "true");
+            SetScalar(dns, "listen", settings.Dns.Listen);
+            SetScalar(dns, "ipv6", settings.Dns.Ipv6 ? "true" : "false");
+            SetScalar(dns, "enhanced-mode", settings.Dns.EnhancedMode);
+            SetScalar(dns, "fake-ip-range", settings.Dns.FakeIpRange);
+            SetScalar(dns, "respect-rules", "true");
+
+            var proxyServerNameserver = new YamlSequenceNode();
+            proxyServerNameserver.Children.Add(new YamlScalarNode("1.1.1.1"));
+            proxyServerNameserver.Children.Add(new YamlScalarNode("8.8.8.8"));
+            var existingProxyServerNameserver = FindKeyNode(dns, "proxy-server-nameserver");
+            if (existingProxyServerNameserver is not null)
+            {
+                dns.Children.Remove(existingProxyServerNameserver);
+            }
+            dns.Children[new YamlScalarNode("proxy-server-nameserver")] = proxyServerNameserver;
+
+            var fakeIpFilter = new YamlSequenceNode();
+            foreach (var filter in settings.Dns.FakeIpFilter)
+            {
+                fakeIpFilter.Children.Add(new YamlScalarNode(filter));
+            }
+            var existingFakeIpFilter = FindKeyNode(dns, "fake-ip-filter");
+            if (existingFakeIpFilter is not null)
+            {
+                dns.Children.Remove(existingFakeIpFilter);
+            }
+            dns.Children[new YamlScalarNode("fake-ip-filter")] = fakeIpFilter;
+
+            var defaultNameserver = new YamlSequenceNode();
+            foreach (var ns in settings.Dns.DefaultNameserver)
+            {
+                defaultNameserver.Children.Add(new YamlScalarNode(ns));
+            }
+            var existingDefaultNameserver = FindKeyNode(dns, "default-nameserver");
+            if (existingDefaultNameserver is not null)
+            {
+                dns.Children.Remove(existingDefaultNameserver);
+            }
+            dns.Children[new YamlScalarNode("default-nameserver")] = defaultNameserver;
+
+            var nameserver = new YamlSequenceNode();
+            foreach (var ns in settings.Dns.Nameserver)
+            {
+                nameserver.Children.Add(new YamlScalarNode(ns));
+            }
+            var existingNameserver = FindKeyNode(dns, "nameserver");
+            if (existingNameserver is not null)
+            {
+                dns.Children.Remove(existingNameserver);
+            }
+            dns.Children[new YamlScalarNode("nameserver")] = nameserver;
+
+            var fallback = new YamlSequenceNode();
+            foreach (var ns in settings.Dns.Fallback)
+            {
+                fallback.Children.Add(new YamlScalarNode(ns));
+            }
+            var existingFallback = FindKeyNode(dns, "fallback");
+            if (existingFallback is not null)
+            {
+                dns.Children.Remove(existingFallback);
+            }
+            dns.Children[new YamlScalarNode("fallback")] = fallback;
+
+            var fallbackFilter = new YamlMappingNode();
+            SetScalar(fallbackFilter, "geoip", settings.Dns.FallbackFilterGeoIp ? "true" : "false");
+            SetScalar(fallbackFilter, "geoip-code", settings.Dns.FallbackFilterGeoIpCode);
+            var fallbackIpFilter = new YamlSequenceNode();
+            foreach (var cidr in settings.Dns.FallbackFilterIpCidr)
+            {
+                fallbackIpFilter.Children.Add(new YamlScalarNode(cidr));
+            }
+            fallbackFilter.Children[new YamlScalarNode("ipcidr")] = fallbackIpFilter;
+            var existingFallbackFilter = FindKeyNode(dns, "fallback-filter");
+            if (existingFallbackFilter is not null)
+            {
+                dns.Children.Remove(existingFallbackFilter);
+            }
+            dns.Children[new YamlScalarNode("fallback-filter")] = fallbackFilter;
+        }
 
         SetScalar(root, "geodata-mode", settings.GeoDataMode ? "true" : "false");
         SetScalar(root, "geo-auto-update", settings.GeoAutoUpdate ? "true" : "false");
@@ -94,6 +180,20 @@ public sealed class SubscriptionConfigComposer
         using var writer = new StringWriter(new StringBuilder());
         stream.Save(writer, assignAnchors: false);
         return writer.ToString();
+    }
+
+    private static void SetSkipCertVerifyForAllProxies(YamlMappingNode root)
+    {
+        if (!root.Children.TryGetValue(new YamlScalarNode("proxies"), out var proxiesNode)
+            || proxiesNode is not YamlSequenceNode proxies)
+        {
+            return;
+        }
+
+        foreach (var proxyNode in proxies.Children.OfType<YamlMappingNode>())
+        {
+            SetScalar(proxyNode, "skip-cert-verify", "true");
+        }
     }
 
     private static string DecodeSubscriptionText(string content)
