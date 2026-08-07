@@ -144,7 +144,7 @@ public sealed class MihomoConfigBuilder
             sb.AppendLine("    interval: 3600");
             sb.AppendLine("    health-check:");
             sb.AppendLine("      enable: true");
-            sb.AppendLine("      url: https://www.gstatic.com/generate_204");
+            sb.AppendLine("      url: http://cp.cloudflare.com/generate_204");
             sb.AppendLine("      interval: 300");
         }
         else
@@ -166,7 +166,7 @@ public sealed class MihomoConfigBuilder
                 sb.AppendLine($"    interval: {Math.Max(provider.IntervalSeconds, 300)}");
                 sb.AppendLine("    health-check:");
                 sb.AppendLine("      enable: true");
-                sb.AppendLine("      url: https://www.gstatic.com/generate_204");
+                sb.AppendLine("      url: http://cp.cloudflare.com/generate_204");
                 sb.AppendLine("      interval: 300");
             }
         }
@@ -179,7 +179,7 @@ public sealed class MihomoConfigBuilder
             sb.AppendLine("  - name: AUTO");
             sb.AppendLine("    type: url-test");
             sb.AppendLine($"    use: [{names}]");
-            sb.AppendLine("    url: https://www.gstatic.com/generate_204");
+            sb.AppendLine("    url: http://cp.cloudflare.com/generate_204");
             sb.AppendLine("    interval: 300");
             sb.AppendLine("  - name: PROXY");
             sb.AppendLine("    type: select");

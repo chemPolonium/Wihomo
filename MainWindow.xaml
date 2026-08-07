@@ -168,7 +168,7 @@
                                 </StackPanel>
                                 <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0">
                                     <TextBlock VerticalAlignment="Center" Text="测试 URL" />
-                                    <TextBox x:Name="DelayTestUrlTextBox" Width="270" Margin="8,0,0,0" Text="https://www.youtube.com/generate_204" />
+                                    <TextBox x:Name="DelayTestUrlTextBox" Width="270" Margin="8,0,0,0" Text="http://cp.cloudflare.com/generate_204" />
                                     <TextBlock VerticalAlignment="Center" Margin="12,0,0,0" Text="超时(ms)" />
                                     <TextBox x:Name="DelayTestTimeoutTextBox" Width="80" Margin="8,0,0,0" Text="5000" />
                                 </StackPanel>

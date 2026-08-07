@@ -598,7 +598,7 @@ public sealed class SubscriptionFormatConverter
         {
             sb.AppendLine($"      - {EscapeYamlValue(proxyName)}");
         }
-        sb.AppendLine("    url: https://www.gstatic.com/generate_204");
+        sb.AppendLine("    url: http://cp.cloudflare.com/generate_204");
         sb.AppendLine("    interval: 300");
         sb.AppendLine("    tolerance: 50");
 
