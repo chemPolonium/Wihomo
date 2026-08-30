@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text;
 using System.Text.Json.Serialization;
 using Wihomo.Models;
+using Wihomo.Services.Realtime;
 
 namespace Wihomo.Services;
 
@@ -11,7 +12,6 @@ public sealed class MihomoApiClient : IDisposable
 {
     private HttpClient _httpClient = CreateNoProxyClient();
     private string? _configuredEndpoint;
-    private readonly Dictionary<string, ConnectionTrafficSnapshot> _connectionTrafficSnapshots = new(StringComparer.Ordinal);
 
     private static HttpClient CreateNoProxyClient()
     {
@@ -74,30 +74,14 @@ public sealed class MihomoApiClient : IDisposable
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task<ConnectionStats> GetConnectionStatsAsync(
-        ConnectionStats? previous,
-        DateTimeOffset? previousTimestamp,
-        CancellationToken cancellationToken = default)
+    /// <summary>
+    /// 与 /connections WebSocket 推送同构的一次性快照，供推送断开时降级轮询复用同一条渲染路径。
+    /// </summary>
+    public async Task<ConnectionsFrame> GetConnectionsFrameAsync(CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.GetFromJsonAsync<MihomoConnectionsResponse>("connections", cancellationToken)
+        return await _httpClient.GetFromJsonAsync<ConnectionsFrame>(
+                   "connections", Realtime.CoreJson.Options, cancellationToken)
             ?? throw new InvalidOperationException("Failed to parse /connections response.");
-
-        var now = DateTimeOffset.UtcNow;
-        var stats = new ConnectionStats
-        {
-            DownloadTotal = response.DownloadTotal,
-            UploadTotal = response.UploadTotal,
-            ActiveConnections = response.Connections?.Count ?? 0
-        };
-
-        if (previous is not null && previousTimestamp is not null)
-        {
-            var seconds = Math.Max((now - previousTimestamp.Value).TotalSeconds, 0.001d);
-            stats.DownloadBytesPerSecond = Math.Max(0d, (stats.DownloadTotal - previous.DownloadTotal) / seconds);
-            stats.UploadBytesPerSecond = Math.Max(0d, (stats.UploadTotal - previous.UploadTotal) / seconds);
-        }
-
-        return stats;
     }
 
     public async Task<List<string>> GetRulesAsync(CancellationToken cancellationToken = default)
@@ -161,144 +145,6 @@ public sealed class MihomoApiClient : IDisposable
         }
 
         return rules;
-    }
-
-    public async Task<List<ConnectionInfo>> GetConnectionsAsync(CancellationToken cancellationToken = default)
-    {
-        using var response = await _httpClient.GetAsync("connections", cancellationToken);
-        var content = await response.Content.ReadAsStringAsync(cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        if (string.IsNullOrWhiteSpace(content))
-        {
-            return [];
-        }
-
-        using var document = JsonDocument.Parse(content);
-        var root = document.RootElement;
-
-        var connectionsElement = root.ValueKind == JsonValueKind.Array
-            ? root
-            : root.TryGetProperty("connections", out var property) && property.ValueKind == JsonValueKind.Array
-                ? property
-                : (root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array ? data : default);
-
-        if (connectionsElement.ValueKind != JsonValueKind.Array)
-        {
-            return [];
-        }
-
-        var capturedAt = DateTimeOffset.UtcNow;
-        var activeConnectionIds = new HashSet<string>(StringComparer.Ordinal);
-        var connections = new List<ConnectionInfo>();
-        foreach (var item in connectionsElement.EnumerateArray())
-        {
-            if (item.ValueKind != JsonValueKind.Object)
-            {
-                continue;
-            }
-
-            var id = GetString(item, "id");
-            var metadata = item.TryGetProperty("metadata", out var metadataElement) && metadataElement.ValueKind == JsonValueKind.Object
-                ? metadataElement
-                : default;
-
-            var source = GetString(metadata, "sourceIP");
-            var sourcePort = GetStringOrNumber(metadata, "sourcePort");
-            var destination = GetString(metadata, "destinationIP");
-            var host = GetString(metadata, "host");
-            var destinationPort = GetStringOrNumber(metadata, "destinationPort");
-            var network = GetString(metadata, "network");
-            var type = GetString(metadata, "type");
-            var rule = GetString(item, "rule");
-            var usedProxy = item.TryGetProperty("chains", out var chainsElement) && chainsElement.ValueKind == JsonValueKind.Array
-                ? chainsElement.EnumerateArray()
-                    .Select(x => x.GetString())
-                    .LastOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? string.Empty
-                : string.Empty;
-            var upload = TryGetLong(item, "upload");
-            var download = TryGetLong(item, "download");
-
-            var connectionKey = string.IsNullOrWhiteSpace(id)
-                ? $"{source}|{sourcePort}|{host}|{destination}|{destinationPort}"
-                : id;
-            activeConnectionIds.Add(connectionKey);
-
-            var uploadRate = 0d;
-            var downloadRate = 0d;
-            if (_connectionTrafficSnapshots.TryGetValue(connectionKey, out var previous))
-            {
-                var seconds = Math.Max((capturedAt - previous.CapturedAt).TotalSeconds, 0.001d);
-                uploadRate = Math.Max(0d, (upload - previous.Upload) / seconds);
-                downloadRate = Math.Max(0d, (download - previous.Download) / seconds);
-            }
-
-            _connectionTrafficSnapshots[connectionKey] = new ConnectionTrafficSnapshot(upload, download, capturedAt);
-
-            var sourceText = FormatEndpoint(source, sourcePort);
-            var destinationEndpoint = FormatEndpoint(destination, destinationPort);
-            var destinationText = string.IsNullOrWhiteSpace(host)
-                ? destinationEndpoint
-                : string.IsNullOrWhiteSpace(destinationEndpoint)
-                    ? host
-                    : $"{host} ({destinationEndpoint})";
-            var requestType = !string.IsNullOrWhiteSpace(type) ? type : network;
-
-            connections.Add(new ConnectionInfo
-            {
-                Source = DisplayOrDash(sourceText),
-                Destination = DisplayOrDash(destinationText),
-                Type = DisplayOrDash(requestType),
-                UsedProxy = DisplayOrDash(usedProxy),
-                Rule = DisplayOrDash(rule),
-                Speed = $"↑ {FormatBytes((long)uploadRate)}/s ↓ {FormatBytes((long)downloadRate)}/s"
-            });
-        }
-
-        _connectionTrafficSnapshots.Keys
-            .Where(key => !activeConnectionIds.Contains(key))
-            .ToList()
-            .ForEach(key => _connectionTrafficSnapshots.Remove(key));
-
-        return connections;
-    }
-
-    private static string FormatEndpoint(string address, string port)
-    {
-        if (string.IsNullOrWhiteSpace(address))
-        {
-            return string.Empty;
-        }
-
-        return string.IsNullOrWhiteSpace(port) ? address : $"{address}:{port}";
-    }
-
-    private static string DisplayOrDash(string value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? "-" : value;
-    }
-
-    private static long TryGetLong(JsonElement element, string propertyName)
-    {
-        return element.ValueKind == JsonValueKind.Object
-            && element.TryGetProperty(propertyName, out var property)
-            && property.ValueKind is JsonValueKind.Number
-            ? property.GetInt64()
-            : 0L;
-    }
-
-    private static string FormatBytes(long bytes)
-    {
-        string[] units = ["B", "KB", "MB", "GB", "TB"];
-        var value = Math.Max(0d, bytes);
-        var unitIndex = 0;
-        while (value >= 1024 && unitIndex < units.Length - 1)
-        {
-            value /= 1024;
-            unitIndex++;
-        }
-
-        return $"{value:0.##} {units[unitIndex]}";
     }
 
     private static string GetString(JsonElement element, string propertyName)
@@ -463,18 +309,6 @@ public sealed class MihomoApiClient : IDisposable
         public string Version { get; set; } = string.Empty;
     }
 
-    private sealed class MihomoConnectionsResponse
-    {
-        [JsonPropertyName("downloadTotal")]
-        public long DownloadTotal { get; set; }
-
-        [JsonPropertyName("uploadTotal")]
-        public long UploadTotal { get; set; }
-
-        [JsonPropertyName("connections")]
-        public List<object>? Connections { get; set; }
-    }
-
     private sealed class ProxySelectionRequest
     {
         [JsonPropertyName("name")]
@@ -487,7 +321,6 @@ public sealed class MihomoApiClient : IDisposable
         public int Delay { get; set; }
     }
 
-    private sealed record ConnectionTrafficSnapshot(long Upload, long Download, DateTimeOffset CapturedAt);
 }
 
 public sealed record SubscriptionDownloadResult(string Content, string? UserInfo);

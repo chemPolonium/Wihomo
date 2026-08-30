@@ -65,8 +65,8 @@ public sealed class MihomoTelemetry : IDisposable
 
             StopCore();
 
-            _traffic = CreateStream(TrafficPath, host, port, secret, Deserialize<TrafficFrame>, TrafficReceived);
-            _connections = CreateStream(ConnectionsPath, host, port, secret, Deserialize<ConnectionsFrame>, ConnectionsReceived);
+            _traffic = CreateStream(TrafficPath, host, port, secret, Deserialize<TrafficFrame>, frame => TrafficReceived?.Invoke(frame));
+            _connections = CreateStream(ConnectionsPath, host, port, secret, Deserialize<ConnectionsFrame>, frame => ConnectionsReceived?.Invoke(frame));
             _logs = CreateStream(LogsPath, host, port, secret, Deserialize<LogFrame>, frame => LogReceived?.Invoke(DateTimeOffset.Now, frame));
 
             _traffic.Start();

@@ -1,11 +1,18 @@
-﻿<Window x:Class="Wihomo.MainWindow"
+<Window x:Class="Wihomo.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:Wihomo.ViewModels"
         mc:Ignorable="d"
-        Title="Wihomo" Icon="Wihomo.ico" Height="720" Width="1000"
+        Title="Wihomo" Height="720" Width="1000"
         MinHeight="620" MinWidth="880">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <Style x:Key="StatLine" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,6,0,0" />
+        </Style>
+    </Window.Resources>
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -14,20 +21,19 @@
         </Grid.RowDefinitions>
 
         <DockPanel Grid.Row="0" Margin="0,0,0,8">
-            <TextBlock x:Name="HeaderCoreStatusTextBlock"
-                       DockPanel.Dock="Left"
+            <TextBlock DockPanel.Dock="Left"
                        VerticalAlignment="Center"
                        FontWeight="SemiBold"
-                       Text="内核状态: 已停止" />
+                       Text="{Binding CoreStatusText}" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button x:Name="StartCoreButton" Content="启动/重启内核" Width="105" Margin="8,0,0,0" Click="StartCoreButton_Click" />
-                <Button x:Name="StopCoreButton" Content="停止内核" Width="90" Margin="8,0,0,0" Click="StopCoreButton_Click" />
+                <Button Content="启动/重启内核" Width="105" Margin="8,0,0,0" Command="{Binding StartCoreCommand}" />
+                <Button Content="停止内核" Width="90" Margin="8,0,0,0" Command="{Binding StopCoreCommand}" />
             </StackPanel>
         </DockPanel>
 
         <TabControl Grid.Row="1">
             <TabItem Header="概览">
-                <Grid Margin="8">
+                <Grid Margin="8" DataContext="{Binding Telemetry}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -42,28 +48,28 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <TextBlock x:Name="CoreStatusTextBlock" Grid.Row="0" FontSize="14" FontWeight="SemiBold" Text="内核状态: 未启动" />
-                    <TextBlock x:Name="VersionTextBlock" Grid.Row="1" Margin="0,6,0,0" Text="内核版本: -" />
-                    <TextBlock x:Name="ConnectionsTextBlock" Grid.Row="2" Margin="0,6,0,0" Text="当前连接数: -" />
-                    <TextBlock x:Name="DownloadTotalTextBlock" Grid.Row="3" Margin="0,6,0,0" Text="累计下载: -" />
-                    <TextBlock x:Name="UploadTotalTextBlock" Grid.Row="4" Margin="0,6,0,0" Text="累计上传: -" />
-                    <TextBlock x:Name="DownloadRateTextBlock" Grid.Row="5" Margin="0,6,0,0" Text="下载速率: -" />
-                    <TextBlock x:Name="UploadRateTextBlock" Grid.Row="6" Margin="0,6,0,0" Text="上传速率: -" />
-                    <TextBlock x:Name="SystemProxyStatusTextBlock" Grid.Row="7" Margin="0,6,0,0" Text="系统代理: 未启用" />
-                    <TextBlock x:Name="TunStatusTextBlock" Grid.Row="8" Margin="0,6,0,0" Text="TUN: 未启用" />
+                    <TextBlock Grid.Row="0" FontSize="14" FontWeight="SemiBold"
+                               Text="{Binding DataContext.CoreStatusText, RelativeSource={RelativeSource AncestorType=Window}}" />
+                    <TextBlock Grid.Row="1" Style="{StaticResource StatLine}" Text="{Binding VersionText}" />
+                    <TextBlock Grid.Row="2" Style="{StaticResource StatLine}" Text="{Binding ConnectionsText}" />
+                    <TextBlock Grid.Row="3" Style="{StaticResource StatLine}" Text="{Binding DownloadTotalText}" />
+                    <TextBlock Grid.Row="4" Style="{StaticResource StatLine}" Text="{Binding UploadTotalText}" />
+                    <TextBlock Grid.Row="5" Style="{StaticResource StatLine}" Text="{Binding DownloadRateText}" />
+                    <TextBlock Grid.Row="6" Style="{StaticResource StatLine}" Text="{Binding UploadRateText}" />
+                    <TextBlock Grid.Row="7" Style="{StaticResource StatLine}" Text="{Binding SystemProxyStatusText}" />
+                    <TextBlock Grid.Row="8" Style="{StaticResource StatLine}" Text="{Binding TunStatusText}" />
                 </Grid>
             </TabItem>
 
             <TabItem Header="订阅管理">
-                <Grid Margin="8">
+                <Grid Margin="8" DataContext="{Binding Subscriptions}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <GroupBox Header="订阅列表">
-                        <DataGrid x:Name="SubscriptionsListBox"
-                                  Margin="8"
+                        <DataGrid Margin="8"
                                   AutoGenerateColumns="False"
                                   CanUserAddRows="False"
                                   CanUserDeleteRows="False"
@@ -71,7 +77,8 @@
                                   IsReadOnly="True"
                                   SelectionMode="Single"
                                   SelectionUnit="FullRow"
-                                  SelectionChanged="SubscriptionsListBox_SelectionChanged">
+                                  ItemsSource="{Binding Items}"
+                                  SelectedItem="{Binding SelectedSubscription, Mode=TwoWay}">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="状态" Binding="{Binding Status}" Width="55" />
                                 <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="*" />
@@ -96,18 +103,24 @@
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="名称" />
-                            <TextBox x:Name="SubscriptionNameTextBox" Grid.Row="0" Grid.Column="1" Margin="8,0,0,8" />
+                            <TextBox Grid.Row="0" Grid.Column="1" Margin="8,0,0,8"
+                                     Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}" />
 
                             <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="URL" />
-                            <TextBox x:Name="SubscriptionUrlTextBox" Grid.Row="1" Grid.Column="1" Margin="8,0,0,8" />
+                            <TextBox Grid.Row="1" Grid.Column="1" Margin="8,0,0,8"
+                                     Text="{Binding EditUrl, UpdateSourceTrigger=PropertyChanged}" />
 
                             <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="更新间隔(秒)" />
-                            <TextBox x:Name="SubscriptionIntervalTextBox" Grid.Row="2" Grid.Column="1" Margin="8,0,0,8" Text="3600" />
+                            <TextBox Grid.Row="2" Grid.Column="1" Margin="8,0,0,8"
+                                     Text="{Binding EditIntervalText, UpdateSourceTrigger=PropertyChanged}" />
 
                             <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Left">
-                                <Button Content="新增/更新" Width="90" Click="AddOrUpdateSubscriptionButton_Click" />
-                                <Button Content="删除订阅" Width="90" Margin="8,0,0,0" Click="RemoveSubscriptionButton_Click" />
-                                <Button Content="激活订阅" Width="90" Margin="8,0,0,0" Click="ActivateSelectedSubscriptionButton_Click" />
+                                <Button Content="新增/更新" Width="90"
+                                        Command="{Binding DataContext.AddOrUpdateSubscriptionCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                <Button Content="删除订阅" Width="90" Margin="8,0,0,0"
+                                        Command="{Binding DataContext.RemoveSubscriptionCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                <Button Content="激活订阅" Width="90" Margin="8,0,0,0"
+                                        Command="{Binding DataContext.ActivateSubscriptionCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
                             </StackPanel>
                         </Grid>
                     </GroupBox>
@@ -115,17 +128,19 @@
             </TabItem>
 
             <TabItem Header="代理组">
-                <Grid Margin="8">
+                <Grid Margin="8" DataContext="{Binding ProxyGroups}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
                     <StackPanel Orientation="Horizontal">
-                        <Button Content="刷新代理组" Width="100" Click="RefreshProxyGroupsButton_Click" />
-                        <Button Content="测试所有节点" Width="110" Margin="8,0,0,0" Click="TestAllProxyDelaysButton_Click" />
-                        <TextBlock x:Name="SelectedGroupStatusTextBlock" Margin="12,4,0,0" Text="当前组: -" />
-                        <TextBlock x:Name="AllDelayTestStatusTextBlock" Margin="12,4,0,0" Text="等待测速" />
+                        <Button Content="刷新代理组" Width="100"
+                                Command="{Binding DataContext.RefreshProxyGroupsCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        <Button Content="测试所有节点" Width="110" Margin="8,0,0,0"
+                                Command="{Binding DataContext.TestAllDelaysCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        <TextBlock Margin="12,4,0,0" Text="{Binding SelectedGroupStatusText}" />
+                        <TextBlock Margin="12,4,0,0" Text="{Binding AllDelayStatusText}" />
                     </StackPanel>
 
                     <Grid Grid.Row="1" Margin="0,8,0,0">
@@ -135,7 +150,10 @@
                         </Grid.ColumnDefinitions>
 
                         <GroupBox Header="代理组" Grid.Column="0" Margin="0,0,8,0">
-                            <ListBox x:Name="ProxyGroupsListBox" Margin="8" SelectionChanged="ProxyGroupsListBox_SelectionChanged" />
+                            <ListBox Margin="8"
+                                     ItemsSource="{Binding Groups}"
+                                     SelectedItem="{Binding SelectedGroup, Mode=TwoWay}"
+                                     DisplayMemberPath="Display" />
                         </GroupBox>
 
                         <GroupBox Header="组成员" Grid.Column="1">
@@ -146,9 +164,8 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
-                                <TextBlock x:Name="ProxyGroupCurrentTextBlock" Text="当前选择: -" />
-                                <DataGrid x:Name="ProxyGroupMembersDataGrid"
-                                          Grid.Row="1"
+                                <TextBlock Text="{Binding CurrentSelectionText}" />
+                                <DataGrid Grid.Row="1"
                                           Margin="0,8,0,8"
                                           AutoGenerateColumns="False"
                                           CanUserAddRows="False"
@@ -156,21 +173,25 @@
                                           CanUserSortColumns="False"
                                           IsReadOnly="True"
                                           SelectionMode="Single"
-                                          SelectionUnit="FullRow">
+                                          SelectionUnit="FullRow"
+                                          ItemsSource="{Binding SelectedGroup.Members}"
+                                          SelectedItem="{Binding SelectedMember, Mode=TwoWay}">
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="节点" Binding="{Binding NodeName}" Width="*" />
                                         <DataGridTextColumn Header="延迟" Binding="{Binding Delay}" Width="100" />
                                     </DataGrid.Columns>
                                 </DataGrid>
                                 <StackPanel Grid.Row="2" Orientation="Horizontal">
-                                    <Button Content="切换到选中节点" Width="120" Click="ApplySelectedProxyButton_Click" />
-                                    <Button Content="测试选中延迟" Width="120" Margin="8,0,0,0" Click="TestProxyDelayButton_Click" />
+                                    <Button Content="切换到选中节点" Width="120"
+                                            Command="{Binding DataContext.ApplyProxyCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                    <Button Content="测试选中延迟" Width="120" Margin="8,0,0,0"
+                                            Command="{Binding DataContext.TestDelayCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
                                 </StackPanel>
                                 <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0">
                                     <TextBlock VerticalAlignment="Center" Text="测试 URL" />
-                                    <TextBox x:Name="DelayTestUrlTextBox" Width="270" Margin="8,0,0,0" Text="http://cp.cloudflare.com/generate_204" />
+                                    <TextBox Width="270" Margin="8,0,0,0" Text="{Binding DelayTestUrl, UpdateSourceTrigger=PropertyChanged}" />
                                     <TextBlock VerticalAlignment="Center" Margin="12,0,0,0" Text="超时(ms)" />
-                                    <TextBox x:Name="DelayTestTimeoutTextBox" Width="80" Margin="8,0,0,0" Text="5000" />
+                                    <TextBox Width="80" Margin="8,0,0,0" Text="{Binding DelayTestTimeoutText, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                             </Grid>
                         </GroupBox>
@@ -179,13 +200,14 @@
             </TabItem>
 
             <TabItem Header="规则">
-                <Grid Margin="8">
+                <Grid Margin="8" DataContext="{Binding Rules}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <StackPanel Orientation="Horizontal">
-                        <Button Content="刷新规则" Width="100" Click="RefreshRulesAndConnectionsButton_Click" />
+                        <Button Content="刷新规则" Width="100"
+                                Command="{Binding DataContext.RefreshRulesCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
                         <TextBlock Margin="12,4,0,0" Text="显示订阅规则与当前生效规则" />
                     </StackPanel>
                     <Grid Grid.Row="1" Margin="0,8,0,0">
@@ -194,25 +216,25 @@
                             <ColumnDefinition Width="1*" />
                         </Grid.ColumnDefinitions>
                         <GroupBox Grid.Column="0" Margin="0,0,8,0" Header="订阅规则">
-                            <ListBox x:Name="SubscriptionRulesListBox" Margin="8" />
+                            <ListBox Margin="8" ItemsSource="{Binding SubscriptionRules}" />
                         </GroupBox>
                         <GroupBox Grid.Column="1" Header="当前规则">
-                            <ListBox x:Name="ActiveRulesListBox" Margin="8" />
+                            <ListBox Margin="8" ItemsSource="{Binding ActiveRules}" />
                         </GroupBox>
                     </Grid>
                 </Grid>
             </TabItem>
 
             <TabItem Header="连接">
-                <Grid Margin="8">
-                    <DataGrid x:Name="ConnectionsDataGrid"
-                              AutoGenerateColumns="False"
+                <Grid Margin="8" DataContext="{Binding Telemetry}">
+                    <DataGrid AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               CanUserDeleteRows="False"
                               CanUserSortColumns="False"
                               IsReadOnly="True"
                               SelectionMode="Single"
-                              SelectionUnit="FullRow">
+                              SelectionUnit="FullRow"
+                              ItemsSource="{Binding Connections}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="入口" Binding="{Binding Source}" Width="1*" />
                             <DataGridTextColumn Header="出口" Binding="{Binding Destination}" Width="3*" />
@@ -232,7 +254,7 @@
                        <RowDefinition Height="*" />
                    </Grid.RowDefinitions>
                    <StackPanel Orientation="Horizontal">
-                       <Button Content="清空日志" Width="90" Click="ClearLogsButton_Click" />
+                       <Button Content="清空日志" Width="90" Command="{Binding ClearLogsCommand}" />
                    </StackPanel>
                    <TextBox x:Name="LogsTextBox"
                             Grid.Row="1"
@@ -247,7 +269,7 @@
 
             <TabItem Header="外部资源">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <Grid Margin="8">
+                    <Grid Margin="8" DataContext="{Binding Settings}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -267,59 +289,68 @@
                                    Text="由 mihomo 负责下载和自动更新 GEO 数据库；此页面仅配置下载地址与更新策略。" />
 
                         <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="GeoIP 数据库" />
-                        <TextBox x:Name="GeoIpUrlTextBox" Grid.Row="1" Grid.Column="1" Margin="8,8,0,0" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Margin="8,8,0,0"
+                                 Text="{Binding GeoIpUrl, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="2" VerticalAlignment="Center" Text="GeoSite 数据库" />
-                        <TextBox x:Name="GeoSiteUrlTextBox" Grid.Row="2" Grid.Column="1" Margin="8,8,0,0" />
+                        <TextBox Grid.Row="2" Grid.Column="1" Margin="8,8,0,0"
+                                 Text="{Binding GeoSiteUrl, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="3" VerticalAlignment="Center" Text="MMDB 数据库" />
-                        <TextBox x:Name="MmdbUrlTextBox" Grid.Row="3" Grid.Column="1" Margin="8,8,0,0" />
+                        <TextBox Grid.Row="3" Grid.Column="1" Margin="8,8,0,0"
+                                 Text="{Binding MmdbUrl, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="4" VerticalAlignment="Center" Text="ASN 数据库" />
-                        <TextBox x:Name="AsnUrlTextBox" Grid.Row="4" Grid.Column="1" Margin="8,8,0,0" />
+                        <TextBox Grid.Row="4" Grid.Column="1" Margin="8,8,0,0"
+                                 Text="{Binding AsnUrl, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="5" VerticalAlignment="Center" Text="Geodata 数据模式" />
-                        <ComboBox x:Name="GeoDataModeComboBox" Grid.Row="5" Grid.Column="1" Width="180"
-                                  HorizontalAlignment="Left" Margin="8,8,0,0">
-                            <ComboBoxItem Content="MMDB（默认）" />
-                            <ComboBoxItem Content="DAT" />
-                        </ComboBox>
+                        <ComboBox Grid.Row="5" Grid.Column="1" Width="180"
+                                  HorizontalAlignment="Left" Margin="8,8,0,0"
+                                  ItemsSource="{x:Static vm:SettingsViewModel.GeoDataModeOptions}"
+                                  DisplayMemberPath="Display"
+                                  SelectedItem="{Binding SelectedGeoDataMode}" />
 
                         <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Margin="8,8,0,0">
-                            <CheckBox x:Name="GeoAutoUpdateCheckBox" Content="自动更新 GEO 数据" VerticalAlignment="Center" />
+                            <CheckBox Content="自动更新 GEO 数据" VerticalAlignment="Center"
+                                      IsChecked="{Binding GeoAutoUpdate}" />
                             <TextBlock Margin="16,0,0,0" VerticalAlignment="Center" Text="更新间隔（小时）" />
-                            <TextBox x:Name="GeoUpdateIntervalTextBox" Width="80" Margin="8,0,0,0" />
+                            <TextBox Width="80" Margin="8,0,0,0"
+                                     Text="{Binding GeoUpdateIntervalText, UpdateSourceTrigger=PropertyChanged}" />
                         </StackPanel>
 
                         <StackPanel Grid.Row="7" Grid.Column="1" Orientation="Horizontal" Margin="8,12,0,0">
                             <Button Width="190" HorizontalAlignment="Left"
-                                    Content="保存外部资源设置并生成配置" Click="SaveAllButton_Click" />
+                                    Content="保存外部资源设置并生成配置"
+                                    Command="{Binding DataContext.SaveAllCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
                             <Button Width="140" HorizontalAlignment="Left" Margin="12,0,0,0"
-                                    Content="手动更新 GEO 数据" Click="ManualUpdateGeoDataButton_Click" />
+                                    Content="手动更新 GEO 数据"
+                                    Command="{Binding DataContext.ManualUpdateGeoDataCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
                         </StackPanel>
                     </Grid>
                 </ScrollViewer>
             </TabItem>
 
             <TabItem Header="YAML 覆写">
-                <Grid Margin="8">
+                <Grid Margin="8" DataContext="{Binding Settings}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <TextBlock Text="对订阅配置进行 YAML 深度合并。key! 强制整体覆盖对象；+key 前置数组；key+ 追加数组。" />
-                    <TextBox x:Name="RuleOverridesTextBox" Grid.Row="1" Margin="0,8,0,0"
+                    <TextBox Grid.Row="1" Margin="0,8,0,0"
                              AcceptsReturn="True" AcceptsTab="True"
                              FontFamily="Consolas"
                              VerticalScrollBarVisibility="Auto"
                              HorizontalScrollBarVisibility="Auto"
-                             TextWrapping="NoWrap" />
+                             TextWrapping="NoWrap"
+                             Text="{Binding RuleOverrides, UpdateSourceTrigger=PropertyChanged}" />
                 </Grid>
             </TabItem>
 
             <TabItem Header="内核设置">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <Grid Margin="8">
+                    <Grid Margin="8" DataContext="{Binding Settings}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -342,57 +373,68 @@
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="内核可执行文件路径" />
-                        <TextBox x:Name="CorePathTextBox" Grid.Row="0" Grid.Column="1" Margin="8,0,0,8" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Margin="8,0,0,8"
+                                 Text="{Binding CorePath, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="工作目录" />
-                        <TextBox x:Name="CoreWorkDirTextBox" Grid.Row="1" Grid.Column="1" Margin="8,0,0,8" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Margin="8,0,0,8"
+                                 Text="{Binding CoreWorkDir, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="External Controller Host" />
-                        <TextBox x:Name="ControllerHostTextBox" Grid.Row="2" Grid.Column="1" Margin="8,0,0,8" />
+                        <TextBox Grid.Row="2" Grid.Column="1" Margin="8,0,0,8"
+                                 Text="{Binding ControllerHost, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="External Controller Port" />
-                        <TextBox x:Name="ControllerPortTextBox" Grid.Row="3" Grid.Column="1" Margin="8,0,0,8" />
+                        <TextBox Grid.Row="3" Grid.Column="1" Margin="8,0,0,8"
+                                 Text="{Binding ControllerPortText, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Mixed Port" />
-                        <TextBox x:Name="MixedPortTextBox" Grid.Row="4" Grid.Column="1" Margin="8,0,0,8" />
+                        <TextBox Grid.Row="4" Grid.Column="1" Margin="8,0,0,8"
+                                 Text="{Binding MixedPortText, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Text="SOCKS Port" />
-                        <TextBox x:Name="SocksPortTextBox" Grid.Row="5" Grid.Column="1" Margin="8,0,0,8" />
+                        <TextBox Grid.Row="5" Grid.Column="1" Margin="8,0,0,8"
+                                 Text="{Binding SocksPortText, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="HTTP Port" />
-                        <TextBox x:Name="HttpPortTextBox" Grid.Row="6" Grid.Column="1" Margin="8,0,0,8" />
+                        <TextBox Grid.Row="6" Grid.Column="1" Margin="8,0,0,8"
+                                 Text="{Binding HttpPortText, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="7" Grid.Column="0" VerticalAlignment="Center" Text="Secret" />
-                        <TextBox x:Name="SecretTextBox" Grid.Row="7" Grid.Column="1" Margin="8,0,0,8" />
+                        <TextBox Grid.Row="7" Grid.Column="1" Margin="8,0,0,8"
+                                 Text="{Binding Secret, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="8" Grid.Column="0" VerticalAlignment="Center" Text="统计刷新间隔(秒)" />
-                        <TextBox x:Name="StatsRefreshTextBox" Grid.Row="8" Grid.Column="1" Margin="8,0,0,8" />
+                        <TextBox Grid.Row="8" Grid.Column="1" Margin="8,0,0,8"
+                                 Text="{Binding StatsRefreshText, UpdateSourceTrigger=PropertyChanged}" />
 
-                        <CheckBox x:Name="StartCoreOnProgramStartCheckBox" Grid.Row="9" Grid.Column="1" Margin="8,0,0,8" Content="启动程序时自动启动内核" />
+                        <CheckBox Grid.Row="9" Grid.Column="1" Margin="8,0,0,8" Content="启动程序时自动启动内核"
+                                  IsChecked="{Binding StartCoreOnProgramStart}" />
 
-                        <CheckBox x:Name="StartWithWindowsCheckBox" Grid.Row="10" Grid.Column="1" Margin="8,0,0,8" Content="登录用户时启动 Wihomo" />
+                        <CheckBox Grid.Row="10" Grid.Column="1" Margin="8,0,0,8" Content="登录用户时启动 Wihomo"
+                                  IsChecked="{Binding StartWithWindows}" />
 
-                        <CheckBox x:Name="EnableSystemProxyCheckBox" Grid.Row="11" Grid.Column="1" Margin="8,0,0,8" Content="启动内核时启用系统代理，停止内核时关闭" />
+                        <CheckBox Grid.Row="11" Grid.Column="1" Margin="8,0,0,8" Content="启动内核时启用系统代理，停止内核时关闭"
+                                  IsChecked="{Binding EnableSystemProxy}" />
 
                         <StackPanel Grid.Row="12" Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,8">
-                            <CheckBox x:Name="EnableTunCheckBox" Content="启用 TUN" VerticalAlignment="Center" />
+                            <CheckBox Content="启用 TUN" VerticalAlignment="Center" IsChecked="{Binding EnableTun}" />
                             <TextBlock Margin="16,0,0,0" VerticalAlignment="Center" Text="TUN Stack" />
-                            <ComboBox x:Name="TunStackComboBox" Width="120" Margin="8,0,0,0" SelectedIndex="0">
-                                <ComboBoxItem Content="mixed" />
-                                <ComboBoxItem Content="system" />
-                                <ComboBoxItem Content="gvisor" />
-                            </ComboBox>
+                            <ComboBox Width="120" Margin="8,0,0,0"
+                                      ItemsSource="{x:Static vm:SettingsViewModel.TunStackOptions}"
+                                      DisplayMemberPath="Display"
+                                      SelectedItem="{Binding SelectedTunStack}" />
                         </StackPanel>
 
                         <Button Grid.Row="13" Grid.Column="1" Width="130" HorizontalAlignment="Left" Content="保存设置"
-                                Click="SaveSettingsOnlyButton_Click" />
+                                Command="{Binding DataContext.SaveSettingsCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
                     </Grid>
                 </ScrollViewer>
             </TabItem>
 
             <TabItem Header="DNS 设置">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <Grid Margin="8">
+                    <Grid Margin="8" DataContext="{Binding Settings}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -412,30 +454,34 @@
                                    TextWrapping="Wrap"
                                    Text="配置 mihomo 的 DNS 解析行为。启用后将使用 fake-ip 模式防止 DNS 污染，并通过 fallback 机制确保国内外域名正确解析。" />
 
-                        <CheckBox x:Name="EnableDnsCheckBox" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,8" Content="启用 DNS" />
+                        <CheckBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,8" Content="启用 DNS"
+                                  IsChecked="{Binding EnableDns}" />
 
                         <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="DNS 监听地址" />
-                        <TextBox x:Name="DnsListenTextBox" Grid.Row="2" Grid.Column="1" Margin="8,0,0,8" />
+                        <TextBox Grid.Row="2" Grid.Column="1" Margin="8,0,0,8"
+                                 Text="{Binding DnsListen, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="增强模式" />
-                        <ComboBox x:Name="DnsEnhancedModeComboBox" Grid.Row="3" Grid.Column="1" Margin="8,0,0,8" SelectedIndex="0">
-                            <ComboBoxItem Content="fake-ip" />
-                            <ComboBoxItem Content="redir-host" />
-                            <ComboBoxItem Content="normal" />
-                        </ComboBox>
+                        <ComboBox Grid.Row="3" Grid.Column="1" Margin="8,0,0,8"
+                                  ItemsSource="{x:Static vm:SettingsViewModel.DnsEnhancedModeOptions}"
+                                  DisplayMemberPath="Display"
+                                  SelectedItem="{Binding SelectedDnsEnhancedMode}" />
 
                         <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Top" Margin="0,4,0,0" Text="默认 DNS (用于解析 DoH 域名，每行一个)" />
-                        <TextBox x:Name="DefaultNameserverTextBox" Grid.Row="4" Grid.Column="1" Margin="8,0,0,8" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
+                        <TextBox Grid.Row="4" Grid.Column="1" Margin="8,0,0,8" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60"
+                                 Text="{Binding DefaultNameserverText, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Top" Margin="0,4,0,0" Text="Nameserver (国内 DNS，每行一个)" />
-                        <TextBox x:Name="NameserverTextBox" Grid.Row="5" Grid.Column="1" Margin="8,0,0,8" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
+                        <TextBox Grid.Row="5" Grid.Column="1" Margin="8,0,0,8" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60"
+                                 Text="{Binding NameserverText, UpdateSourceTrigger=PropertyChanged}" />
 
                         <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Top" Margin="0,4,0,0" Text="Fallback (海外 DNS，每行一个)" />
-                        <TextBox x:Name="FallbackTextBox" Grid.Row="6" Grid.Column="1" Margin="8,0,0,8" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
+                        <TextBox Grid.Row="6" Grid.Column="1" Margin="8,0,0,8" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60"
+                                 Text="{Binding FallbackText, UpdateSourceTrigger=PropertyChanged}" />
 
                         <StackPanel Grid.Row="7" Grid.Column="1" Orientation="Horizontal" Margin="8,8,0,8">
                             <Button Width="130" HorizontalAlignment="Left" Content="保存设置"
-                                    Click="SaveSettingsOnlyButton_Click" />
+                                    Command="{Binding DataContext.SaveSettingsCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
                             <TextBlock Margin="16,0,0,0" VerticalAlignment="Center" Foreground="Gray"
                                        Text="修改后需重启内核生效" />
                         </StackPanel>
@@ -445,7 +491,11 @@
         </TabControl>
 
         <Border Grid.Row="2" Margin="0,8,0,0" Padding="8" CornerRadius="4">
-            <TextBlock x:Name="MessageTextBlock" Text="就绪" />
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Right" FontWeight="SemiBold" Text="有未保存更改"
+                           Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVis}}" />
+                <TextBlock TextWrapping="Wrap" Text="{Binding Message}" />
+            </DockPanel>
         </Border>
     </Grid>
 </Window>
