@@ -3,3 +3,7 @@
 *.exe binary
 *.ico binary
 *.png binary
+
+# 金标准快照断言逐字节相等，禁止换行归一化改写基线
+**/Golden/*.verified.txt -text
+**/Golden/*.received.txt -text

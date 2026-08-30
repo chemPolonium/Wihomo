@@ -1,0 +1,113 @@
+mixed-port: 1080
+socks-port: 7891
+port: 7892
+allow-lan: false
+mode: rule
+log-level: info
+ipv6: true
+external-controller: 127.0.0.1:9090
+secret: 'wihomo'
+profile:
+  store-selected: true
+  store-fake-ip: true
+
+tun:
+  enable: true
+  stack: mixed
+  auto-route: true
+  auto-detect-interface: true
+  strict-route: true
+
+dns:
+  enable: true
+  listen: "0.0.0.0:53"
+  ipv6: true
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  respect-rules: true
+  proxy-server-nameserver:
+    - 1.1.1.1
+    - 8.8.8.8
+  fake-ip-filter:
+    - "*.lan"
+    - "*.local"
+    - "*.localhost"
+    - "dns.msftncsi.com"
+    - "www.msftncsi.com"
+    - "www.msftconnecttest.com"
+  default-nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+  nameserver:
+    - "https://dns.alidns.com/dns-query"
+    - "https://doh.pub/dns-query"
+  fallback:
+    - "https://dns.cloudflare.com/dns-query"
+    - "https://dns.google/dns-query"
+  fallback-filter:
+    geoip: true
+    geoip-code: CN
+    ipcidr:
+      - 240.0.0.0/4
+
+geodata-mode: true
+geo-auto-update: false
+geo-update-interval: 1
+
+geox-url:
+  geoip: 'https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip-lite.dat'
+  geosite: 'https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat'
+  mmdb: 'https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb'
+  asn: 'https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/GeoLite2-ASN.mmdb'
+
+proxy-providers:
+  My_机场_A:
+    type: file
+    path: ./proxy_providers/My_机场_A.yaml
+    interval: 300
+    health-check:
+      enable: true
+      url: http://cp.cloudflare.com/generate_204
+      interval: 300
+  B_Node:
+    type: http
+    url: 'https://b.example/'
+    path: ./proxy_providers/B_Node.yaml
+    interval: 7200
+    health-check:
+      enable: true
+      url: http://cp.cloudflare.com/generate_204
+      interval: 300
+
+proxy-groups:
+  - name: AUTO
+    type: url-test
+    use: ['My_机场_A', 'B_Node']
+    url: http://cp.cloudflare.com/generate_204
+    interval: 300
+  - name: PROXY
+    type: select
+    proxies:
+      - AUTO
+      - DIRECT
+  - name: SELECT
+    type: select
+    proxies:
+      - PROXY
+      - DIRECT
+  - name: '我的落地'
+    type: select
+    proxies:
+      - PROXY
+      - DIRECT
+
+rules:
+  - DOMAIN-SUFFIX,example.com,我的落地
+  - DOMAIN,1.1.1.1,DIRECT
+  - GEOIP,CN,REJECT
+  - SRC-IP-CIDR,10.0.0.0/8,PASS
+  - DOMAIN,proxy.com,PROXY
+  - DOMAIN,auto.com,AUTO
+  - DOMAIN,select.com,SELECT
+  - GEOSITE,cn,我的落地
+  - MATCH,PROXY

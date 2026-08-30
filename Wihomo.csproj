@@ -10,6 +10,19 @@
     <ApplicationIcon>Wihomo.ico</ApplicationIcon>
   </PropertyGroup>
 
+  <!-- 测试工程内嵌于工程根目录，需显式排除，否则会被默认 **/*.cs 通配编译进主程序集 -->
+  <ItemGroup>
+    <Compile Remove="Wihomo.Tests\**" />
+    <None Remove="Wihomo.Tests\**" />
+    <Page Remove="Wihomo.Tests\**" />
+    <Content Remove="Wihomo.Tests\**" />
+    <Compile Remove="artifacts\**" />
+    <Compile Remove="mihomo-src\**" />
+    <Compile Remove="tmp-mihomo-test\**" />
+    <Content Remove="artifacts\**" />
+    <None Remove="artifacts\**" />
+  </ItemGroup>
+
   <ItemGroup>
     <Content Include="assets\geodata\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

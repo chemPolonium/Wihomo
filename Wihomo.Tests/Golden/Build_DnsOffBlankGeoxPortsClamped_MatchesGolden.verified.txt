@@ -1,0 +1,47 @@
+mixed-port: 1
+socks-port: 1
+port: 1
+allow-lan: false
+mode: rule
+log-level: info
+ipv6: true
+external-controller: 0.0.0.0:-5
+secret: 's e c r e t'
+profile:
+  store-selected: true
+  store-fake-ip: true
+
+tun:
+  enable: false
+  stack: mixed
+  auto-route: true
+  auto-detect-interface: true
+  strict-route: true
+
+geodata-mode: false
+geo-auto-update: true
+geo-update-interval: 24
+
+proxy-providers:
+  default:
+    type: file
+    path: ./proxy_providers/default.yaml
+    interval: 3600
+    health-check:
+      enable: true
+      url: http://cp.cloudflare.com/generate_204
+      interval: 300
+
+proxy-groups:
+  - name: PROXY
+    type: select
+    proxies:
+      - DIRECT
+  - name: SELECT
+    type: select
+    proxies:
+      - PROXY
+      - DIRECT
+
+rules:
+  - MATCH,PROXY
