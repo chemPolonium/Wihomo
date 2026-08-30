@@ -1,0 +1,47 @@
+{
+  "observed": {
+    "coreVersion": "v1.19.29",
+    "coreBuild": "Mihomo Meta v1.19.29 windows amd64 with go1.26.5 with_gvisor",
+    "coreBinary": "assets/core/mihomo-windows-amd64-v3.exe",
+    "capturedAt": "2026-08-30",
+    "method": "raw HTTP Upgrade via node, plus a local origin server behind the mixed port; no external network involved",
+    "webSocketPaths": ["/traffic", "/connections", "/logs", "/memory"],
+    "webSocketPathsNotFound": ["/ws", "/ws/traffic", "/ws/logs", "/ws/memory", "/ws/connections", "/ws/proxies", "/ws/provider", "/providers"],
+    "webSocketPathsNotUpgradeable": ["/proxies", "/rules", "/version"],
+    "authentication": "Authorization: Bearer <secret> header only; ?secret=<x> query param returns 401 on both REST and WebSocket; no credentials returns 401",
+    "unauthenticatedResponse": { "status": 401, "body": "{\"message\":\"Unauthorized\"}" },
+    "frameOpcode": "text (0x1) only; no ping/pong observed across 9s per stream",
+    "cadence": "one frame per second for /traffic, /connections and /memory; /logs is event driven and silent while the core is idle",
+    "notes": [
+      "/traffic reports up/down as bytes transferred in the last interval (i.e. bytes per second) and upTotal/downTotal as cumulative bytes",
+      "/connections reports the same cumulative counters under the different key names downloadTotal/uploadTotal; both streams were observed to agree exactly (770 and 20874756)",
+      "/connections connections is null, not an empty array, when nothing is active, and is a full snapshot on every push",
+      "/logs frames carry no timestamp field, only type and payload; the client is responsible for stamping time",
+      "metadata ports are JSON strings, not numbers (sourcePort \"57734\", destinationPort \"18081\", inboundPort \"17890\")",
+      "metadata carries many fields the current client discards: inboundName, dnsMode, uid, process, processPath, remoteDestination, dscp, sniffHost, sourceIPASN, destinationIPASN",
+      "start is RFC3339 with a 7 digit fraction and a numeric timezone offset",
+      "chains is an array; providerChains is a parallel array whose entries may be empty strings"
+    ]
+  },
+  "traffic": [
+    "{\"up\":0,\"down\":0,\"upTotal\":0,\"downTotal\":0}",
+    "{\"up\":308,\"down\":264,\"upTotal\":308,\"downTotal\":264}",
+    "{\"up\":308,\"down\":16777960,\"upTotal\":616,\"downTotal\":16778224}",
+    "{\"up\":0,\"down\":0,\"upTotal\":616,\"downTotal\":16778224}",
+    "{\"up\":0,\"down\":0,\"upTotal\":770,\"downTotal\":20874756}"
+  ],
+  "memory": [
+    "{\"inuse\":0,\"oslimit\":0}",
+    "{\"inuse\":26157056,\"oslimit\":0}"
+  ],
+  "logs": [
+    "{\"type\":\"info\",\"payload\":\"[TCP] 127.0.0.1:50371 --\\u003e 127.0.0.1:17890 match Match using DIRECT\"}",
+    "{\"type\":\"info\",\"payload\":\"[TCP] 127.0.0.1:57679 --\\u003e 127.0.0.1:18080 match Match using DIRECT\"}",
+    "{\"type\":\"info\",\"payload\":\"[TCP] 127.0.0.1:57683 --\\u003e 127.0.0.1:18080 match Match using DIRECT\"}"
+  ],
+  "connections": [
+    "{\"downloadTotal\":0,\"uploadTotal\":0,\"connections\":null,\"memory\":0}",
+    "{\"downloadTotal\":20874756,\"uploadTotal\":770,\"connections\":null,\"memory\":26157056}",
+    "{\"downloadTotal\":17188184,\"uploadTotal\":770,\"connections\":[{\"id\":\"0a22d296-b59f-494e-becf-380db2fa421a\",\"metadata\":{\"network\":\"tcp\",\"type\":\"HTTP\",\"sourceIP\":\"127.0.0.1\",\"destinationIP\":\"127.0.0.1\",\"sourceGeoIP\":null,\"destinationGeoIP\":null,\"sourceIPASN\":\"\",\"destinationIPASN\":\"\",\"sourcePort\":\"57734\",\"destinationPort\":\"18081\",\"inboundIP\":\"127.0.0.1\",\"inboundPort\":\"17890\",\"inboundName\":\"DEFAULT-MIXED\",\"inboundUser\":\"\",\"rematchName\":\"\",\"host\":\"\",\"dnsMode\":\"normal\",\"uid\":0,\"process\":\"\",\"processPath\":\"\",\"specialProxy\":\"\",\"specialRules\":\"\",\"remoteDestination\":\"127.0.0.1\",\"dscp\":0,\"sniffHost\":\"\"},\"upload\":77,\"download\":204980,\"start\":\"2026-08-30T21:17:15.0831363+08:00\",\"chains\":[\"DIRECT\"],\"providerChains\":[\"\"],\"rule\":\"Match\",\"rulePayload\":\"\"},{\"id\":\"aa211393-3b9a-4c08-9207-5d1cb5177545\",\"metadata\":{\"network\":\"tcp\",\"type\":\"HTTP\",\"sourceIP\":\"127.0.0.1\",\"destinationIP\":\"127.0.0.1\",\"sourceGeoIP\":null,\"destinationGeoIP\":null,\"sourceIPASN\":\"\",\"destinationIPASN\":\"\",\"sourcePort\":\"57733\",\"destinationPort\":\"18081\",\"inboundIP\":\"127.0.0.1\",\"inboundPort\":\"17890\",\"inboundName\":\"DEFAULT-MIXED\",\"inboundUser\":\"\",\"rematchName\":\"\",\"host\":\"\",\"dnsMode\":\"normal\",\"uid\":0,\"process\":\"\",\"processPath\":\"\",\"specialProxy\":\"\",\"specialRules\":\"\",\"remoteDestination\":\"127.0.0.1\",\"dscp\":0,\"sniffHost\":\"\"},\"upload\":77,\"download\":204980,\"start\":\"2026-08-30T21:17:15.0826043+08:00\",\"chains\":[\"DIRECT\"],\"providerChains\":[\"\"],\"rule\":\"Match\",\"rulePayload\":\"\"}],\"memory\":26157056}"
+  ]
+}
