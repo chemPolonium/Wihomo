@@ -7,9 +7,10 @@ using Wihomo.Models;
 
 namespace Wihomo.Services;
 
-public sealed class MihomoApiClient
+public sealed class MihomoApiClient : IDisposable
 {
     private HttpClient _httpClient = CreateNoProxyClient();
+    private string? _configuredEndpoint;
     private readonly Dictionary<string, ConnectionTrafficSnapshot> _connectionTrafficSnapshots = new(StringComparer.Ordinal);
 
     private static HttpClient CreateNoProxyClient()
@@ -18,15 +19,24 @@ public sealed class MihomoApiClient
         return new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
     }
 
+    /// <summary>
+    /// 每个刷新 tick 都会被调用，因此只在端点真正变化时重建客户端，避免 socket churn。
+    /// </summary>
     public void Configure(string host, int port, string secret)
     {
-        _httpClient.Dispose();
+        var endpoint = $"{host}|{port}|{secret}";
+        if (string.Equals(endpoint, _configuredEndpoint, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var previous = _httpClient;
         var handler = new SocketsHttpHandler
         {
             UseProxy = false,
             Proxy = null
         };
-        _httpClient = new HttpClient(handler)
+        var client = new HttpClient(handler)
         {
             BaseAddress = new Uri($"http://{host}:{port}/"),
             Timeout = TimeSpan.FromSeconds(10)
@@ -34,9 +44,17 @@ public sealed class MihomoApiClient
 
         if (!string.IsNullOrWhiteSpace(secret))
         {
-            var authValue = "Bearer " + secret;
-            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", secret);
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", secret);
         }
+
+        _httpClient = client;
+        _configuredEndpoint = endpoint;
+        previous.Dispose();
+    }
+
+    public void Dispose()
+    {
+        _httpClient.Dispose();
     }
 
     public async Task<string> GetVersionAsync(CancellationToken cancellationToken = default)

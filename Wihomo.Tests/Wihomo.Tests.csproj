@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <Content Include="Golden\**\*.verified.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Protocol\**\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
