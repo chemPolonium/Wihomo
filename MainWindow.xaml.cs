@@ -59,7 +59,7 @@ public partial class MainWindow : Window
         {
             _settings = await _settingsService.LoadAsync();
             ApplyDefaults();
-            EnsureSingleActiveSubscription();
+            SubscriptionUsage.EnsureSingleActive(_settings);
             BindSettingsToUi();
             ResetStatsTimer();
             SetMessage($"设置已加载: {_settingsService.SettingsPath}");
@@ -324,7 +324,7 @@ public partial class MainWindow : Window
         {
             var name = SubscriptionNameTextBox.Text.Trim();
             var url = SubscriptionUrlTextBox.Text.Trim();
-            var interval = ParsePositiveInt(SubscriptionIntervalTextBox.Text, "更新间隔(秒)");
+            var interval = SettingsParsing.ParsePositiveInt(SubscriptionIntervalTextBox.Text, "更新间隔(秒)");
 
             if (string.IsNullOrWhiteSpace(name))
             {
@@ -429,7 +429,7 @@ public partial class MainWindow : Window
             throw new InvalidOperationException($"找不到订阅文件，请先通过「新增/更新」下载订阅: {selected.Name}");
         }
 
-        DisableOtherSubscriptions(selected.Name);
+        SubscriptionUsage.DisableOthers(_settings, selected.Name);
         selected.Enabled = true;
         _settings.ActiveSubscriptionName = selected.Name;
         await _settingsService.SaveAsync(_settings);
@@ -440,7 +440,7 @@ public partial class MainWindow : Window
         File.Copy(subscriptionFile, activeFile, overwrite: true);
 
         var content = File.ReadAllText(subscriptionFile, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        ParseSubscriptionRules(content);
+        _settings.SubscriptionRules = SubscriptionParser.Parse(content).Rules;
         RefreshSubscriptionRulesView();
 
         if (_processManager.IsRunning)
@@ -515,7 +515,7 @@ public partial class MainWindow : Window
                 throw new InvalidOperationException("测试 URL 无效。");
             }
 
-            var timeout = ParsePositiveInt(DelayTestTimeoutTextBox.Text, "超时(ms)");
+            var timeout = SettingsParsing.ParsePositiveInt(DelayTestTimeoutTextBox.Text, "超时(ms)");
             ConfigureApiClient();
             var delay = await _apiClient.TestProxyDelayAsync(proxyName, url, timeout);
             _proxyDelayResults[proxyName] = delay.HasValue ? $"{delay.Value} ms" : "失败";
@@ -538,7 +538,7 @@ public partial class MainWindow : Window
                 throw new InvalidOperationException("测试 URL 无效。");
             }
 
-            var timeout = ParsePositiveInt(DelayTestTimeoutTextBox.Text, "超时(ms)");
+            var timeout = SettingsParsing.ParsePositiveInt(DelayTestTimeoutTextBox.Text, "超时(ms)");
             ConfigureApiClient();
             var proxyNames = await _apiClient.GetTestableProxyNamesAsync();
             if (proxyNames.Count == 0)
@@ -652,10 +652,10 @@ public partial class MainWindow : Window
         _previousStatsTimestamp = capturedAt;
 
         ConnectionsTextBlock.Text = $"当前连接数: {stats.ActiveConnections}";
-        DownloadTotalTextBlock.Text = $"累计下载: {FormatBytes(stats.DownloadTotal)}";
-        UploadTotalTextBlock.Text = $"累计上传: {FormatBytes(stats.UploadTotal)}";
-        DownloadRateTextBlock.Text = $"下载速率: {FormatBytes((long)stats.DownloadBytesPerSecond)}/s";
-        UploadRateTextBlock.Text = $"上传速率: {FormatBytes((long)stats.UploadBytesPerSecond)}/s";
+        DownloadTotalTextBlock.Text = $"累计下载: {SettingsParsing.FormatBytes(stats.DownloadTotal)}";
+        UploadTotalTextBlock.Text = $"累计上传: {SettingsParsing.FormatBytes(stats.UploadTotal)}";
+        DownloadRateTextBlock.Text = $"下载速率: {SettingsParsing.FormatBytes((long)stats.DownloadBytesPerSecond)}/s";
+        UploadRateTextBlock.Text = $"上传速率: {SettingsParsing.FormatBytes((long)stats.UploadBytesPerSecond)}/s";
     }
 
     private async Task RefreshRulesAndConnectionsAsync()
@@ -896,7 +896,7 @@ public partial class MainWindow : Window
         }
 
         _settings.GeoxUrls ??= new GeoxUrlSettings();
-        EnsureDefaultExternalResourceUrls(_settings.GeoxUrls);
+        SettingsParsing.EnsureDefaultExternalResourceUrls(_settings.GeoxUrls);
 
         if (_settings.GeoUpdateIntervalHours <= 0)
         {
@@ -946,12 +946,12 @@ public partial class MainWindow : Window
         var corePath = CorePathTextBox.Text.Trim();
         var workDir = CoreWorkDirTextBox.Text.Trim();
         var host = ControllerHostTextBox.Text.Trim();
-        var port = ParsePositiveInt(ControllerPortTextBox.Text, "External Controller Port");
-        var mixedPort = ParsePositiveInt(MixedPortTextBox.Text, "Mixed Port");
-        var socksPort = ParsePositiveInt(SocksPortTextBox.Text, "SOCKS Port");
-        var httpPort = ParsePositiveInt(HttpPortTextBox.Text, "HTTP Port");
-        var statsRefresh = ParsePositiveInt(StatsRefreshTextBox.Text, "统计刷新间隔(秒)");
-        var geoUpdateInterval = ParsePositiveInt(GeoUpdateIntervalTextBox.Text, "GEO 更新间隔（小时）");
+        var port = SettingsParsing.ParsePositiveInt(ControllerPortTextBox.Text, "External Controller Port");
+        var mixedPort = SettingsParsing.ParsePositiveInt(MixedPortTextBox.Text, "Mixed Port");
+        var socksPort = SettingsParsing.ParsePositiveInt(SocksPortTextBox.Text, "SOCKS Port");
+        var httpPort = SettingsParsing.ParsePositiveInt(HttpPortTextBox.Text, "HTTP Port");
+        var statsRefresh = SettingsParsing.ParsePositiveInt(StatsRefreshTextBox.Text, "统计刷新间隔(秒)");
+        var geoUpdateInterval = SettingsParsing.ParsePositiveInt(GeoUpdateIntervalTextBox.Text, "GEO 更新间隔（小时）");
 
         if (string.IsNullOrWhiteSpace(corePath))
         {
@@ -995,10 +995,10 @@ public partial class MainWindow : Window
             SubscriptionRules = _settings.SubscriptionRules,
             GeoxUrls = new GeoxUrlSettings
             {
-                GeoIp = ParseAbsoluteUrl(GeoIpUrlTextBox.Text, "GeoIP 数据库 URL"),
-                GeoSite = ParseAbsoluteUrl(GeoSiteUrlTextBox.Text, "GeoSite 数据库 URL"),
-                Mmdb = ParseAbsoluteUrl(MmdbUrlTextBox.Text, "MMDB 数据库 URL"),
-                Asn = ParseAbsoluteUrl(AsnUrlTextBox.Text, "ASN 数据库 URL")
+                GeoIp = SettingsParsing.ParseAbsoluteUrl(GeoIpUrlTextBox.Text, "GeoIP 数据库 URL"),
+                GeoSite = SettingsParsing.ParseAbsoluteUrl(GeoSiteUrlTextBox.Text, "GeoSite 数据库 URL"),
+                Mmdb = SettingsParsing.ParseAbsoluteUrl(MmdbUrlTextBox.Text, "MMDB 数据库 URL"),
+                Asn = SettingsParsing.ParseAbsoluteUrl(AsnUrlTextBox.Text, "ASN 数据库 URL")
             },
             Dns = new DnsSettings
             {
@@ -1016,9 +1016,9 @@ public partial class MainWindow : Window
                     "www.msftncsi.com",
                     "www.msftconnecttest.com"
                 ],
-                DefaultNameserver = ParseMultilineText(DefaultNameserverTextBox.Text),
-                Nameserver = ParseMultilineText(NameserverTextBox.Text),
-                Fallback = ParseMultilineText(FallbackTextBox.Text),
+                DefaultNameserver = SettingsParsing.ParseMultilineText(DefaultNameserverTextBox.Text),
+                Nameserver = SettingsParsing.ParseMultilineText(NameserverTextBox.Text),
+                Fallback = SettingsParsing.ParseMultilineText(FallbackTextBox.Text),
                 FallbackFilterGeoIp = true,
                 FallbackFilterGeoIpCode = "CN",
                 FallbackFilterIpCidr = ["240.0.0.0/4"]
@@ -1167,9 +1167,9 @@ public partial class MainWindow : Window
         File.WriteAllText(downloadPath, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         AppendLogLine($"已保存订阅文件: {downloadPath}");
 
-        ApplySubscriptionUsage(subscription, download.UserInfo);
+        SubscriptionUsage.Apply(subscription, download.UserInfo);
         RefreshSubscriptionsList();
-        ParseSubscriptionRules(content);
+        _settings.SubscriptionRules = SubscriptionParser.Parse(content).Rules;
         RefreshSubscriptionRulesView();
     }
 
@@ -1277,230 +1277,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ParseSubscriptionRules(string content)
-    {
-        var parsed = ParseSubscriptionContent(content);
-        _settings.SubscriptionRules = parsed.Rules;
-    }
-
-    private SubscriptionContentParseResult ParseSubscriptionContent(string content)
-    {
-        var rules = new List<string>();
-        if (string.IsNullOrWhiteSpace(content))
-        {
-            return new SubscriptionContentParseResult(rules);
-        }
-
-        var normalized = DecodeSubscriptionText(content);
-        var lines = normalized.Replace("\r\n", "\n").Split('\n');
-        var section = string.Empty;
-        var sectionIndent = -1;
-
-        foreach (var rawLine in lines)
-        {
-            var trimmed = rawLine.Trim();
-            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith('#'))
-            {
-                continue;
-            }
-
-            var indent = CountLeadingSpaces(rawLine);
-            if (section.Length > 0 && indent <= sectionIndent && !trimmed.StartsWith("- ", StringComparison.Ordinal))
-            {
-                section = string.Empty;
-                sectionIndent = -1;
-            }
-
-            if (string.Equals(trimmed, "rules:", StringComparison.OrdinalIgnoreCase))
-            {
-                section = "rules";
-                sectionIndent = indent;
-                continue;
-            }
-
-            if (section == "rules" && trimmed.StartsWith("- ", StringComparison.Ordinal))
-            {
-                var candidate = trimmed[2..].Trim();
-                if (IsRuleCandidate(candidate))
-                {
-                    rules.Add(candidate);
-                }
-            }
-        }
-
-        return new SubscriptionContentParseResult(
-            rules
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Distinct(StringComparer.Ordinal)
-            .ToList());
-    }
-
-    private static bool IsRuleCandidate(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return false;
-        }
-
-        if (text.Contains(',') || text.Contains("MATCH") || text.Contains("FINAL"))
-        {
-            return true;
-        }
-
-        return text.StartsWith("DOMAIN", StringComparison.Ordinal)
-            || text.StartsWith("IP-CIDR", StringComparison.Ordinal)
-            || text.StartsWith("SRC-IP-CIDR", StringComparison.Ordinal)
-            || text.StartsWith("GEOIP", StringComparison.Ordinal)
-            || text.StartsWith("GEOSITE", StringComparison.Ordinal)
-            || text.StartsWith("PROCESS-NAME", StringComparison.Ordinal)
-            || text.StartsWith("URL-REGEX", StringComparison.Ordinal)
-            || text.StartsWith("RULE-SET", StringComparison.Ordinal)
-            || text.StartsWith("AND", StringComparison.Ordinal)
-            || text.StartsWith("OR", StringComparison.Ordinal)
-            || text.StartsWith("NOT", StringComparison.Ordinal);
-    }
-
-    private static int CountLeadingSpaces(string text)
-    {
-        var index = 0;
-        while (index < text.Length && text[index] == ' ')
-        {
-            index++;
-        }
-
-        return index;
-    }
-
-    private static string DecodeSubscriptionText(string content)
-    {
-        var normalized = content.Trim();
-        if (!LooksLikeBase64(normalized))
-        {
-            return content;
-        }
-
-        try
-        {
-            var cleaned = new string(normalized.Where(c => !char.IsWhiteSpace(c)).ToArray());
-            var remainder = cleaned.Length % 4;
-            if (remainder == 2)
-            {
-                cleaned += "==";
-            }
-            else if (remainder == 3)
-            {
-                cleaned += "=";
-            }
-            else if (remainder == 1)
-            {
-                return content;
-            }
-
-            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(cleaned));
-            return decoded.Contains('\0') ? content : decoded;
-        }
-        catch
-        {
-            return content;
-        }
-    }
-
-    private static bool LooksLikeBase64(string text)
-    {
-        if (text.Length < 20)
-        {
-            return false;
-        }
-
-        foreach (var ch in text)
-        {
-            if (!char.IsLetterOrDigit(ch) && ch != '+' && ch != '/' && ch != '='
-                && ch != '\n' && ch != '\r' && ch != ' ' && ch != '\t')
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private sealed record SubscriptionContentParseResult(List<string> Rules);
-
-    private static void ApplySubscriptionUsage(SubscriptionItem subscription, string? userInfo)
-    {
-        if (string.IsNullOrWhiteSpace(userInfo))
-        {
-            return;
-        }
-
-        var values = userInfo
-            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(part => part.Split('=', 2, StringSplitOptions.TrimEntries))
-            .Where(parts => parts.Length == 2)
-            .ToDictionary(parts => parts[0], parts => parts[1], StringComparer.OrdinalIgnoreCase);
-
-        if (TryGetNonNegativeLong(values, "upload", out var upload))
-        {
-            subscription.UploadBytes = upload;
-        }
-        if (TryGetNonNegativeLong(values, "download", out var download))
-        {
-            subscription.DownloadBytes = download;
-        }
-        if (TryGetNonNegativeLong(values, "total", out var total))
-        {
-            subscription.TotalBytes = total;
-        }
-        if (TryGetNonNegativeLong(values, "expire", out var expire)
-            && expire is >= 0 and <= 253402300799)
-        {
-            subscription.ExpireAt = DateTimeOffset.FromUnixTimeSeconds(expire).ToLocalTime();
-        }
-    }
-
-    private static bool TryGetNonNegativeLong(
-        IReadOnlyDictionary<string, string> values,
-        string key,
-        out long value)
-    {
-        value = 0;
-        return values.TryGetValue(key, out var text)
-            && long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value)
-            && value >= 0;
-    }
-
-    private void EnsureSingleActiveSubscription()
-    {
-        var enabledSubs = _settings.Subscriptions.Where(x => x.Enabled).ToList();
-        if (enabledSubs.Count <= 1)
-        {
-            return;
-        }
-
-        // Keep the one matching ActiveSubscriptionName, or the first one
-        var keep = enabledSubs.FirstOrDefault(x =>
-            string.Equals(x.Name, _settings.ActiveSubscriptionName, StringComparison.OrdinalIgnoreCase))
-            ?? enabledSubs[0];
-
-        foreach (var sub in _settings.Subscriptions)
-        {
-            sub.Enabled = string.Equals(sub.Name, keep.Name, StringComparison.OrdinalIgnoreCase);
-        }
-
-        _settings.ActiveSubscriptionName = keep.Name;
-    }
-
-    private void DisableOtherSubscriptions(string activeName)
-    {
-        foreach (var sub in _settings.Subscriptions)
-        {
-            if (!string.Equals(sub.Name, activeName, StringComparison.OrdinalIgnoreCase))
-            {
-                sub.Enabled = false;
-            }
-        }
-    }
-
     private void RefreshSubscriptionsList()
     {
         SubscriptionsListBox.ItemsSource = null;
@@ -1508,8 +1284,8 @@ public partial class MainWindow : Window
             .Select(x => new SubscriptionRow(
                 x.Enabled ? "★ 活动" : "停用",
                 x.Name,
-                FormatBytes(x.UploadBytes + x.DownloadBytes),
-                x.TotalBytes > 0 ? FormatBytes(x.TotalBytes) : "-",
+                SettingsParsing.FormatBytes(x.UploadBytes + x.DownloadBytes),
+                x.TotalBytes > 0 ? SettingsParsing.FormatBytes(x.TotalBytes) : "-",
                 x.ExpireAt?.ToString("yyyy-MM-dd", CultureInfo.CurrentCulture) ?? "-"))
             .ToList();
     }
@@ -1638,15 +1414,6 @@ public partial class MainWindow : Window
         return "fake-ip";
     }
 
-    private static List<string> ParseMultilineText(string text)
-    {
-        return text
-            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
-            .Select(x => x.Trim())
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .ToList();
-    }
-
     private void SelectGeoDataMode(bool useDat)
     {
         GeoDataModeComboBox.SelectedIndex = useDat ? 1 : 0;
@@ -1655,41 +1422,6 @@ public partial class MainWindow : Window
     private bool GetSelectedGeoDataMode()
     {
         return GeoDataModeComboBox.SelectedIndex == 1;
-    }
-
-    private static string ParseAbsoluteUrl(string text, string fieldName)
-    {
-        var value = text.Trim();
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
-            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-        {
-            throw new InvalidOperationException($"{fieldName} 无效。");
-        }
-
-        return value;
-    }
-
-    private static void EnsureDefaultExternalResourceUrls(GeoxUrlSettings geoxUrls)
-    {
-        if (string.IsNullOrWhiteSpace(geoxUrls.GeoIp))
-        {
-            geoxUrls.GeoIp = GeoxUrlSettings.DefaultGeoIpUrl;
-        }
-
-        if (string.IsNullOrWhiteSpace(geoxUrls.GeoSite))
-        {
-            geoxUrls.GeoSite = GeoxUrlSettings.DefaultGeoSiteUrl;
-        }
-
-        if (string.IsNullOrWhiteSpace(geoxUrls.Mmdb))
-        {
-            geoxUrls.Mmdb = GeoxUrlSettings.DefaultMmdbUrl;
-        }
-
-        if (string.IsNullOrWhiteSpace(geoxUrls.Asn))
-        {
-            geoxUrls.Asn = GeoxUrlSettings.DefaultAsnUrl;
-        }
     }
 
     private void AppendLogLine(string line)
@@ -1709,30 +1441,6 @@ public partial class MainWindow : Window
     private void SetMessage(string message)
     {
         MessageTextBlock.Text = message;
-    }
-
-    private static int ParsePositiveInt(string text, string fieldName)
-    {
-        if (!int.TryParse(text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) || value <= 0)
-        {
-            throw new InvalidOperationException($"{fieldName} 必须是正整数。");
-        }
-
-        return value;
-    }
-
-    private static string FormatBytes(long bytes)
-    {
-        string[] units = ["B", "KB", "MB", "GB", "TB"];
-        var value = Math.Max(0d, bytes);
-        var unitIndex = 0;
-        while (value >= 1024 && unitIndex < units.Length - 1)
-        {
-            value /= 1024;
-            unitIndex++;
-        }
-
-        return $"{value:0.##} {units[unitIndex]}";
     }
 
     private void ExecuteUiAction(Action action)
