@@ -1,8 +1,4 @@
-[CmdletBinding()]
-param(
-    [string]$Version = "1.1.2"
-)
-
+# 版本号以 Wihomo.iss 里的 #define MyAppVersion 为唯一来源，这里不要传 /DMyAppVersion 造出第二份。
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -24,7 +20,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish 失败，退出代码: $LASTEXITCODE"
 }
 
-& $isccPath "/DMyAppVersion=$Version" "/DPublishDir=$publishDirectory" (Join-Path $PSScriptRoot "Wihomo.iss")
+& $isccPath "/DPublishDir=$publishDirectory" (Join-Path $PSScriptRoot "Wihomo.iss")
 
 if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup 编译失败，退出代码: $LASTEXITCODE"
