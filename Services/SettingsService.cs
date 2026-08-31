@@ -13,8 +13,15 @@ public sealed class SettingsService
 
     private readonly string _settingsPath;
 
-    public SettingsService()
+    /// <param name="settingsPath">缺省落到 %AppData%\Wihomo\settings.json；测试注入临时路径以免触碰真实设置。</param>
+    public SettingsService(string? settingsPath = null)
     {
+        if (settingsPath is not null)
+        {
+            _settingsPath = settingsPath;
+            return;
+        }
+
         var baseDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Wihomo");

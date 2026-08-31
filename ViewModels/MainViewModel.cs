@@ -539,14 +539,20 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private void RemoveSubscription() => RunSafely(RemoveSubscriptionInternal);
+    private Task RemoveSubscriptionAsync() => RunSafelyAsync(RemoveSubscriptionAsyncInternal);
 
-    private void RemoveSubscriptionInternal()
+    private async Task RemoveSubscriptionAsyncInternal()
     {
         var selected = Subscriptions.SelectedSubscription
             ?? throw new InvalidOperationException("请先选择要删除的订阅。");
 
         _settings.Subscriptions.Remove(selected.Item);
+        if (string.Equals(_settings.ActiveSubscriptionName, selected.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            _settings.ActiveSubscriptionName = string.Empty;
+        }
+
+        await _settingsService.SaveAsync(_settings);
         Subscriptions.Load(_settings);
         Message = "订阅已删除。";
     }
