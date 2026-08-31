@@ -31,14 +31,25 @@ dotnet build
 dotnet run
 ```
 
+## 测试
+
+```bash
+dotnet test
+```
+
+测试体系包含：配置生成的黄金基线（golden master）、mihomo WebSocket 协议帧回放、视图模型单元测试，以及真实实例化 MainWindow 的绑定接线检查。集成测试会拉起内置的 mihomo 内核验证遥测链路。
+
 ## 项目结构
 
 ```
-├── MainWindow.xaml / .cs    # 主窗口 UI 与逻辑
-├── Models/                  # 数据模型（设置、订阅、连接等）
-├── Services/                # 服务层（内核管理、API 客户端、配置生成等）
+├── MainWindow.xaml / .cs    # 窗口外壳：托盘宿主、关闭即隐藏、日志控件增量追加
+├── ViewModels/              # MVVM 视图模型（CommunityToolkit.Mvvm），承载全部业务状态与命令
+├── Models/                  # 数据模型（设置、订阅、代理组等）
+├── Services/                # 服务层（内核管理、API 客户端、配置生成、订阅解析等）
+│   └── Realtime/            # WebSocket 实时遥测：流量/连接/日志推送，断线自动重连
+├── Wihomo.Tests/            # xUnit 测试工程
 ├── assets/                  # 内置 mihomo 内核与 Geo 数据文件
-└── Installer/               # Windows 安装包配置
+└── Installer/               # Windows 安装包配置（Inno Setup）
 ```
 
 ## 许可证
