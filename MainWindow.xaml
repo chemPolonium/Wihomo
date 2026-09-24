@@ -58,7 +58,7 @@
                     <TextBlock Grid.Row="6" Style="{StaticResource StatLine}" Text="{Binding UploadRateText}" />
                     <TextBlock Grid.Row="7" Style="{StaticResource StatLine}" Text="{Binding SystemProxyStatusText}" />
                     <TextBlock Grid.Row="8" Style="{StaticResource StatLine}" Text="{Binding TunStatusText}" />
-                    <TextBlock Grid.Row="9" Style="{StaticResource StatLine}" Text="程序版本: 1.1.2" />
+                    <TextBlock Grid.Row="9" Style="{StaticResource StatLine}" Text="程序版本: 1.2.0" />
                 </Grid>
             </TabItem>
 
