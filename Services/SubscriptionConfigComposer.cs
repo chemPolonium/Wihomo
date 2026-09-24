@@ -87,8 +87,15 @@ public sealed class SubscriptionConfigComposer
             }
             dns.Children[new YamlScalarNode("proxy-server-nameserver")] = proxyServerNameserver;
 
+            var fakeIpFilterNames = settings.Core.BypassLocalNetworks
+                ? settings.Dns.FakeIpFilter
+                    .Concat(LocalNetworkBypass.FakeIpFilter)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+                : settings.Dns.FakeIpFilter;
+
             var fakeIpFilter = new YamlSequenceNode();
-            foreach (var filter in settings.Dns.FakeIpFilter)
+            foreach (var filter in fakeIpFilterNames)
             {
                 fakeIpFilter.Children.Add(new YamlScalarNode(filter));
             }
@@ -150,6 +157,11 @@ public sealed class SubscriptionConfigComposer
                 dns.Children.Remove(existingFallbackFilter);
             }
             dns.Children[new YamlScalarNode("fallback-filter")] = fallbackFilter;
+
+            if (settings.Core.BypassLocalNetworks)
+            {
+                ApplyLocalBypassNameserverPolicy(dns);
+            }
         }
 
         SetScalar(root, "geodata-mode", settings.GeoDataMode ? "true" : "false");
@@ -177,9 +189,55 @@ public sealed class SubscriptionConfigComposer
             }
         }
 
+        if (settings.Core.BypassLocalNetworks)
+        {
+            PrependLocalBypassRules(root);
+        }
+
         using var writer = new StringWriter(new StringBuilder());
         stream.Save(writer, assignAnchors: false);
         return writer.ToString();
+    }
+
+    /// <summary>内网域名走系统解析；订阅已自行声明的同名条目保持不动。</summary>
+    private static void ApplyLocalBypassNameserverPolicy(YamlMappingNode dns)
+    {
+        var policy = GetOrCreateMap(dns, "nameserver-policy");
+        foreach (var (domain, upstream) in LocalNetworkBypass.NameserverPolicy)
+        {
+            if (FindKeyNode(policy, domain) is null)
+            {
+                policy.Children[new YamlScalarNode(domain)] = new YamlScalarNode(upstream);
+            }
+        }
+    }
+
+    /// <summary>把直连规则插到订阅规则最前面，订阅中已原样存在的跳过。</summary>
+    private static void PrependLocalBypassRules(YamlMappingNode root)
+    {
+        var keyNode = FindKeyNode(root, "rules");
+        if (keyNode is not null && root.Children[keyNode] is not YamlSequenceNode)
+        {
+            return;
+        }
+
+        var rules = keyNode is not null
+            ? (YamlSequenceNode)root.Children[keyNode]
+            : new YamlSequenceNode();
+
+        var present = rules.Children.OfType<YamlScalarNode>()
+            .Select(x => x.Value ?? string.Empty)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var rule in LocalNetworkBypass.Rules.Reverse().Where(x => !present.Contains(x)))
+        {
+            rules.Children.Insert(0, new YamlScalarNode(rule));
+        }
+
+        if (keyNode is null)
+        {
+            root.Children[new YamlScalarNode("rules")] = rules;
+        }
     }
 
     private static void SetSkipCertVerifyForAllProxies(YamlMappingNode root)

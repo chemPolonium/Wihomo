@@ -126,6 +126,24 @@ internal static class Fixtures
         },
     };
 
+    /// <summary>订阅里已有一条内网规则，用于验证直连规则不会重复注入。</summary>
+    public static AppSettings LocalBypass() => new()
+    {
+        Core = new CoreRuntimeSettings
+        {
+            EnableSystemProxy = true,
+            EnableTun = true,
+            TunStack = "system",
+            BypassLocalNetworks = true,
+        },
+        SubscriptionRules =
+        [
+            "DOMAIN-SUFFIX,local,DIRECT",
+            "GEOSITE,cn,PROXY",
+            "MATCH,PROXY",
+        ],
+    };
+
     public const string SubscriptionYaml = """
 proxies:
   - name: HK-01
@@ -172,6 +190,25 @@ rules:
     {
         Core = new CoreRuntimeSettings { TunStack = "system", EnableTun = true },
     };
+
+    public static AppSettings ComposeLocalBypass() => new()
+    {
+        Core = new CoreRuntimeSettings { TunStack = "system", EnableTun = true, BypassLocalNetworks = true },
+    };
+
+    /// <summary>订阅自行声明了 nameserver-policy，程序不得覆盖。</summary>
+    public const string SubscriptionYamlWithNameserverPolicy = """
+dns:
+  enable: true
+  nameserver:
+    - 114.114.114.114
+  nameserver-policy:
+    "*.lan": 192.168.1.1
+
+rules:
+  - MATCH,DIRECT
+
+""";
 
     public static AppSettings ComposeWithOverrides() => new()
     {

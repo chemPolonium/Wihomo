@@ -13,4 +13,5 @@ public sealed class CoreRuntimeSettings
     public bool EnableSystemProxy { get; set; }
     public bool EnableTun { get; set; }
     public string TunStack { get; set; } = "mixed";
+    public bool BypassLocalNetworks { get; set; }
 }

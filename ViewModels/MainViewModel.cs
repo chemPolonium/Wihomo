@@ -424,6 +424,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 EnableSystemProxy = _settings.Core.EnableSystemProxy,
                 EnableTun = _settings.Core.EnableTun,
                 TunStack = _settings.Core.TunStack,
+                BypassLocalNetworks = _settings.Core.BypassLocalNetworks,
             },
             Subscriptions = _settings.Subscriptions,
             ActiveSubscriptionName = _settings.ActiveSubscriptionName,

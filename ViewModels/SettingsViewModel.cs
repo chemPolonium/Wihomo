@@ -41,6 +41,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _statsRefreshText = string.Empty;
     [ObservableProperty] private bool _enableSystemProxy;
     [ObservableProperty] private bool _enableTun;
+    [ObservableProperty] private bool _bypassLocalNetworks;
     [ObservableProperty] private bool _startCoreOnProgramStart;
     [ObservableProperty] private bool _startWithWindows;
     [ObservableProperty] private LabeledOption _selectedTunStack;
@@ -92,6 +93,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         StatsRefreshText = settings.StatsRefreshSeconds.ToString();
         EnableSystemProxy = settings.Core.EnableSystemProxy;
         EnableTun = settings.Core.EnableTun;
+        BypassLocalNetworks = settings.Core.BypassLocalNetworks;
         StartCoreOnProgramStart = settings.StartCoreOnProgramStart;
         StartWithWindows = settings.StartWithWindows;
         SelectedTunStack = FindOption(TunStackOptions, settings.Core.TunStack);
@@ -158,6 +160,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         settings.Core.Secret = Secret;
         settings.Core.EnableSystemProxy = EnableSystemProxy;
         settings.Core.EnableTun = EnableTun;
+        settings.Core.BypassLocalNetworks = BypassLocalNetworks;
         settings.Core.TunStack = SelectedTunStack.Value;
 
         settings.StatsRefreshSeconds = statsRefresh;

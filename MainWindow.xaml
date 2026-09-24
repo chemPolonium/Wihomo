@@ -367,6 +367,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="180" />
@@ -427,7 +428,12 @@
                                       SelectedItem="{Binding SelectedTunStack}" />
                         </StackPanel>
 
-                        <Button Grid.Row="13" Grid.Column="1" Width="130" HorizontalAlignment="Left" Content="保存设置"
+                        <CheckBox Grid.Row="13" Grid.Column="1" Margin="8,0,0,8"
+                                  Content="让本地与局域网连接绕过代理"
+                                  ToolTip="内网 IP 与 .lan/.local/.home.arpa 域名直连，打印机/NAS/路由器不经过代理"
+                                  IsChecked="{Binding BypassLocalNetworks}" />
+
+                        <Button Grid.Row="14" Grid.Column="1" Width="130" HorizontalAlignment="Left" Content="保存设置"
                                 Command="{Binding DataContext.SaveSettingsCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
                     </Grid>
                 </ScrollViewer>

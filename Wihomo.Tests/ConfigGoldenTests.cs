@@ -33,6 +33,13 @@ public class MihomoConfigBuilderGoldenTests
         var actual = new MihomoConfigBuilder().Build(Fixtures.EscapingEdgeCases());
         GoldenMaster.Verify(nameof(Build_EscapingEdgeCases_MatchesGolden), actual);
     }
+
+    [Fact]
+    public void Build_LocalBypass_MatchesGolden()
+    {
+        var actual = new MihomoConfigBuilder().Build(Fixtures.LocalBypass());
+        GoldenMaster.Verify(nameof(Build_LocalBypass_MatchesGolden), actual);
+    }
 }
 
 public class SubscriptionConfigComposerGoldenTests
@@ -50,5 +57,13 @@ public class SubscriptionConfigComposerGoldenTests
         var actual = new SubscriptionConfigComposer()
             .Compose(Fixtures.SubscriptionYaml, Fixtures.ComposeWithOverrides());
         GoldenMaster.Verify(nameof(Compose_AllOverrideOperators_MatchesGolden), actual);
+    }
+
+    [Fact]
+    public void Compose_LocalBypass_MatchesGolden()
+    {
+        var actual = new SubscriptionConfigComposer()
+            .Compose(Fixtures.SubscriptionYaml, Fixtures.ComposeLocalBypass());
+        GoldenMaster.Verify(nameof(Compose_LocalBypass_MatchesGolden), actual);
     }
 }

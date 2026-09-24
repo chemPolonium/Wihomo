@@ -52,12 +52,28 @@ public sealed class MihomoConfigBuilder
             sb.AppendLine("    - 1.1.1.1");
             sb.AppendLine("    - 8.8.8.8");
 
-            if (settings.Dns.FakeIpFilter.Count > 0)
+            var fakeIpFilter = settings.Core.BypassLocalNetworks
+                ? settings.Dns.FakeIpFilter
+                    .Concat(LocalNetworkBypass.FakeIpFilter)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+                : settings.Dns.FakeIpFilter;
+
+            if (fakeIpFilter.Count > 0)
             {
                 sb.AppendLine("  fake-ip-filter:");
-                foreach (var filter in settings.Dns.FakeIpFilter)
+                foreach (var filter in fakeIpFilter)
                 {
                     sb.AppendLine($"    - \"{filter}\"");
+                }
+            }
+
+            if (settings.Core.BypassLocalNetworks)
+            {
+                sb.AppendLine("  nameserver-policy:");
+                foreach (var (domain, upstream) in LocalNetworkBypass.NameserverPolicy)
+                {
+                    sb.AppendLine($"    \"{domain}\": \"{upstream}\"");
                 }
             }
 
@@ -234,6 +250,11 @@ public sealed class MihomoConfigBuilder
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        foreach (var line in LocalBypassRules(settings.Core.BypassLocalNetworks, subscriptionRules))
+        {
+            sb.AppendLine($"  - {line}");
+        }
+
         foreach (var line in subscriptionRules)
         {
             sb.AppendLine($"  - {line}");
@@ -246,6 +267,18 @@ public sealed class MihomoConfigBuilder
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>去掉订阅里已经原样存在的直连规则，避免规则页出现重复条目。</summary>
+    private static IEnumerable<string> LocalBypassRules(bool enabled, IReadOnlyList<string> subscriptionRules)
+    {
+        if (!enabled)
+        {
+            return [];
+        }
+
+        return LocalNetworkBypass.Rules
+            .Where(x => !subscriptionRules.Contains(x, StringComparer.OrdinalIgnoreCase));
     }
 
     public static string NormalizeName(string raw)
