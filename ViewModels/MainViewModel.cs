@@ -697,40 +697,48 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             throw new InvalidOperationException("未找到可测速的代理节点。");
         }
 
-        ProxyGroups.AllDelayStatusText = $"正在测试 {proxyNames.Count} 个节点...";
+        var total = proxyNames.Count;
+        var completed = 0;
+        var usable = 0;
+        ProxyGroups.AllDelayStatusText = $"正在测试 0/{total} 个节点...";
 
         using var concurrency = new SemaphoreSlim(4);
-        var results = await Task.WhenAll(proxyNames.Select(async name =>
+        await Task.WhenAll(proxyNames.Select(async name =>
         {
+            int? delay = null;
             await concurrency.WaitAsync();
             try
             {
-                var delay = await _apiClient.TestProxyDelayAsync(name, url, timeout);
-                return (name, delay);
+                delay = await _apiClient.TestProxyDelayAsync(name, url, timeout);
             }
-            catch (HttpRequestException)
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
-                return (name, (int?)null);
-            }
-            catch (TaskCanceledException)
-            {
-                return (name, (int?)null);
+                delay = null;
             }
             finally
             {
                 concurrency.Release();
             }
+
+            if (delay.HasValue)
+            {
+                Interlocked.Increment(ref usable);
+            }
+
+            var done = Interlocked.Increment(ref completed);
+
+            // 测完一个落一个，不等全部节点返回
+            _dispatcher.Post(() =>
+            {
+                var delayText = delay.HasValue ? $"{delay.Value} ms" : "失败";
+                _delayResults[name] = delayText;
+                ProxyGroups.SetDelay(name, delayText);
+                ProxyGroups.AllDelayStatusText = $"正在测试 {done}/{total} 个节点...";
+            });
         }));
 
-        foreach (var (name, delay) in results)
-        {
-            _delayResults[name] = delay.HasValue ? $"{delay.Value} ms" : "失败";
-        }
-
-        ProxyGroups.RefreshDelays(NameOfDelay);
-        var usable = results.Count(x => x.Item2.HasValue);
-        ProxyGroups.AllDelayStatusText = $"测速完成: {usable}/{results.Length} 个节点可用";
-        Message = $"全部节点测速完成: {usable}/{results.Length} 个节点可用。";
+        ProxyGroups.AllDelayStatusText = $"测速完成: {usable}/{total} 个节点可用";
+        Message = $"全部节点测速完成: {usable}/{total} 个节点可用。";
     }
 
     private (string Url, int Timeout) ReadDelayTestArguments()

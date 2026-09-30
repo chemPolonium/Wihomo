@@ -95,6 +95,18 @@ public sealed partial class ProxyGroupsViewModel : ObservableObject
         SelectedMember = SelectedGroup.LoadMembers(SelectedGroup.Info.Options, delayOf, SelectedMember?.NodeName);
     }
 
+    /// <summary>就地改写已加载的节点行，供逐项返回的测速使用，避免整表重建。</summary>
+    public void SetDelay(string nodeName, string delayText)
+    {
+        foreach (var member in Groups.SelectMany(x => x.Members))
+        {
+            if (string.Equals(member.NodeName, nodeName, StringComparison.Ordinal))
+            {
+                member.Delay = delayText;
+            }
+        }
+    }
+
     partial void OnSelectedGroupChanged(ProxyGroupViewModel? value)
     {
         if (value is null)

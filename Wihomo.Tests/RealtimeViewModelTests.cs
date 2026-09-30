@@ -219,6 +219,32 @@ public class ProxyGroupsViewModelTests
     }
 
     [Fact]
+    public void 逐项测速就地改行不重建成员列表()
+    {
+        var vm = new ProxyGroupsViewModel();
+        vm.Replace(
+            [Group("a", current: "n1", options: ["n1", "n2"]), Group("b", options: ["n1", "n3"])],
+            _ => "未测试",
+            showCurrentInHeader: true);
+
+        // 两组都点开过，成员行才同时在内存里
+        vm.SelectedGroup = vm.Groups[1];
+        vm.SelectedGroup = vm.Groups[0];
+        vm.SelectedMember = vm.Groups[0].Members[1];
+        var rowA = vm.Groups[0].Members[0];
+        var rowB = vm.Groups[1].Members[0];
+        var selected = vm.Groups[0].Members[1];
+
+        vm.SetDelay("n1", "12 ms");
+
+        Assert.Equal("12 ms", rowA.Delay);
+        Assert.Equal("12 ms", rowB.Delay);
+        Assert.Equal("未测试", selected.Delay);
+        Assert.Same(rowA, vm.Groups[0].Members[0]);
+        Assert.Same(selected, vm.SelectedMember);
+    }
+
+    [Fact]
     public void 清空后不残留选中状态()
     {
         var vm = new ProxyGroupsViewModel();
