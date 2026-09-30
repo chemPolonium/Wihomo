@@ -68,7 +68,7 @@ public sealed class MihomoTelemetryIntegrationTests : IAsyncLifetime
         // 顺带验证 REST 客户端在新生命周期管理下可用。
         using var api = new MihomoApiClient();
         api.Configure("127.0.0.1", _controllerPort, Secret);
-        Assert.Equal("v1.19.29", await WaitUntilReadyAsync(api));
+        Assert.Equal("v1.19.31", await WaitUntilReadyAsync(api));
 
         var telemetry = new MihomoTelemetry();
         var traffic = new FrameCollector<TrafficFrame>();
@@ -120,7 +120,7 @@ public sealed class MihomoTelemetryIntegrationTests : IAsyncLifetime
             // 重连：重启内核后必须自动恢复并继续收到帧。
             traffic.Clear();
             StartCore();
-            Assert.Equal("v1.19.29", await WaitUntilReadyAsync(api));
+            Assert.Equal("v1.19.31", await WaitUntilReadyAsync(api));
             await GenerateTrafficAsync();
 
             var recovered = await traffic.FirstAsync(
