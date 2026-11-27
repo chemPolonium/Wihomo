@@ -14,23 +14,15 @@
     <WinUISDKReferences>false</WinUISDKReferences>
     <EnableMsixTooling>true</EnableMsixTooling>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <UseWindowsForms>true</UseWindowsForms>
-    <!-- 仅使用 WinForms 的 NotifyIcon；禁止 WindowsDesktop SDK 再跑 WPF 的 XAML 编译 -->
-    <ImportFrameworkWinFXTargets>true</ImportFrameworkWinFXTargets>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>1.4.0</Version>
+    <Version>1.4.1</Version>
     <PublishTrimmed>false</PublishTrimmed>
     <PublishReadyToRun>false</PublishReadyToRun>
     <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
     <!-- 未启用 AOT/裁剪，ObservableProperty 字段生成器在 WinRT 场景的提示不适用 -->
     <NoWarn>$(NoWarn);MVVMTK0045</NoWarn>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Using Remove="System.Windows.Forms" />
-    <Using Remove="System.Drawing" />
-  </ItemGroup>
 
   <!-- 测试工程内嵌于工程根目录，需显式排除，否则会被默认 **/*.cs 通配编译进主程序集 -->
   <ItemGroup>
@@ -66,6 +58,7 @@
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="H.NotifyIcon.WinUI" Version="2.4.1" />
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2957" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.7.0" />

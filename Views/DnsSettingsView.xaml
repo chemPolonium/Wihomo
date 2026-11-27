@@ -7,98 +7,72 @@
     mc:Ignorable="d">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Padding="12" Spacing="12">
-            <Border Style="{StaticResource Card}">
-                <Grid RowSpacing="8" ColumnSpacing="8">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="180" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
+        <StackPanel Padding="24" Spacing="16">
+            <TextBlock
+                AutomationProperties.HeadingLevel="Level1"
+                Style="{StaticResource TitleTextBlockStyle}"
+                Text="DNS 设置" />
+            <Expander
+                Header="解析配置"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Stretch"
+                IsExpanded="True">
+                <StackPanel Spacing="16">
                     <TextBlock
-                        Grid.ColumnSpan="2"
-                        TextWrapping="Wrap"
-                        Text="配置 mihomo 的 DNS 解析行为。启用后将使用 fake-ip 模式防止 DNS 污染，并通过 fallback 机制确保国内外域名正确解析。" />
+                        Text="配置 mihomo 的 DNS 解析行为。启用后将使用 fake-ip 模式防止 DNS 污染，并通过 fallback 机制确保国内外域名正确解析。"
+                        TextWrapping="Wrap" />
 
                     <CheckBox
-                        Grid.Row="1"
-                        Grid.ColumnSpan="2"
                         Content="启用 DNS"
                         IsChecked="{x:Bind ViewModel.Settings.EnableDns, Mode=TwoWay}" />
 
-                    <TextBlock Grid.Row="2" Style="{StaticResource FormLabel}" Text="DNS 监听地址" />
                     <TextBox
-                        Grid.Row="2"
-                        Grid.Column="1"
+                        Header="DNS 监听地址"
                         Text="{x:Bind ViewModel.Settings.DnsListen, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="3" Style="{StaticResource FormLabel}" Text="增强模式" />
                     <ComboBox
-                        Grid.Row="3"
-                        Grid.Column="1"
+                        Header="增强模式"
                         DisplayMemberPath="Display"
                         ItemsSource="{x:Bind ViewModel.Settings.DnsEnhancedModeOptionList}"
                         SelectedItem="{x:Bind ViewModel.Settings.SelectedDnsEnhancedMode, Mode=TwoWay}" />
 
-                    <TextBlock
-                        Grid.Row="4"
-                        VerticalAlignment="Top"
-                        Text="默认 DNS (用于解析 DoH 域名，每行一个)" />
                     <TextBox
-                        Grid.Row="4"
-                        Grid.Column="1"
-                        MinHeight="60"
+                        Header="默认 DNS（用于解析 DoH 域名，每行一个）"
                         AcceptsReturn="True"
+                        MinHeight="96"
+                        MaxHeight="160"
+                        ScrollViewer.VerticalScrollBarVisibility="Auto"
                         Text="{x:Bind ViewModel.Settings.DefaultNameserverText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                         TextWrapping="Wrap" />
 
-                    <TextBlock
-                        Grid.Row="5"
-                        VerticalAlignment="Top"
-                        Text="Nameserver (国内 DNS，每行一个)" />
                     <TextBox
-                        Grid.Row="5"
-                        Grid.Column="1"
-                        MinHeight="60"
+                        Header="Nameserver（国内 DNS，每行一个）"
                         AcceptsReturn="True"
+                        MinHeight="96"
+                        MaxHeight="160"
+                        ScrollViewer.VerticalScrollBarVisibility="Auto"
                         Text="{x:Bind ViewModel.Settings.NameserverText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                         TextWrapping="Wrap" />
 
-                    <TextBlock
-                        Grid.Row="6"
-                        VerticalAlignment="Top"
-                        Text="Fallback (海外 DNS，每行一个)" />
                     <TextBox
-                        Grid.Row="6"
-                        Grid.Column="1"
-                        MinHeight="60"
+                        Header="Fallback（海外 DNS，每行一个）"
                         AcceptsReturn="True"
+                        MinHeight="96"
+                        MaxHeight="160"
+                        ScrollViewer.VerticalScrollBarVisibility="Auto"
                         Text="{x:Bind ViewModel.Settings.FallbackText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                         TextWrapping="Wrap" />
 
-                    <StackPanel
-                        Grid.Row="7"
-                        Grid.Column="1"
-                        Orientation="Horizontal"
-                        Spacing="12">
-                        <Button MinWidth="130" Content="保存设置" Command="{x:Bind ViewModel.SaveSettingsCommand}" />
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button
+                            Content="保存设置"
+                            Command="{x:Bind ViewModel.SaveSettingsCommand}" />
                         <TextBlock
                             VerticalAlignment="Center"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Text="修改后需重启内核生效" />
                     </StackPanel>
-                </Grid>
-            </Border>
+                </StackPanel>
+            </Expander>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

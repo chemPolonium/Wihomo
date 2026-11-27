@@ -4,26 +4,67 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:tb="using:H.NotifyIcon"
     Title="Wihomo"
     mc:Ignorable="d">
 
-    <Grid x:Name="Root" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="Root">
         <Grid.KeyboardAccelerators>
             <KeyboardAccelerator Key="Escape" Invoked="Escape_Invoked" />
         </Grid.KeyboardAccelerators>
 
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
+        <TitleBar
+            x:Name="AppTitleBar"
+            Title="{x:Bind DisplayName}"
+            IsBackButtonVisible="False"
+            IsPaneToggleButtonVisible="True"
+            PaneToggleRequested="TitleBar_PaneToggleRequested">
+            <TitleBar.Resources>
+                <HorizontalAlignment x:Key="TitleBarContentHorizontalAlignment">Stretch</HorizontalAlignment>
+            </TitleBar.Resources>
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="ms-appx:///Branding/AppIcon.ico" />
+            </TitleBar.IconSource>
+            <TitleBar.Content>
+                <StackPanel
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal"
+                    Spacing="16">
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Text="{x:Bind ViewModel.CoreStatusText, Mode=OneWay}" />
+                    <CommandBar
+                        VerticalAlignment="Center"
+                        DefaultLabelPosition="Right">
+                        <AppBarButton
+                            Icon="Play"
+                            Label="启动/重启内核"
+                            Command="{x:Bind ViewModel.StartCoreCommand}" />
+                        <AppBarButton
+                            Icon="Stop"
+                            Label="停止内核"
+                            Command="{x:Bind ViewModel.StopCoreCommand}" />
+                    </CommandBar>
+                </StackPanel>
+            </TitleBar.Content>
+        </TitleBar>
+
         <NavigationView
             x:Name="Navigation"
-            OpenPaneLength="210"
-            CompactPaneLength="48"
+            Grid.Row="1"
             PaneDisplayMode="Left"
-            PaneTitle="Wihomo"
             IsBackButtonVisible="Collapsed"
+            IsPaneToggleButtonVisible="False"
             IsSettingsVisible="False"
             SelectionChanged="Navigation_SelectionChanged">
 
@@ -40,35 +81,19 @@
                 <NavigationViewItem Content="DNS 设置" Tag="dns-settings" Icon="Sync" />
             </NavigationView.MenuItems>
 
-            <NavigationView.Header>
-                <Grid Padding="0,12,0,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock
-                        VerticalAlignment="Center"
-                        FontWeight="SemiBold"
-                        Text="{x:Bind ViewModel.CoreStatusText, Mode=OneWay}" />
-                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                        <Button MinWidth="112" Content="启动/重启内核" Command="{x:Bind ViewModel.StartCoreCommand}" />
-                        <Button MinWidth="96" Margin="8,0,0,0" Content="停止内核" Command="{x:Bind ViewModel.StopCoreCommand}" />
-                    </StackPanel>
-                </Grid>
-            </NavigationView.Header>
-
             <ContentControl
                 x:Name="PageHost"
                 HorizontalContentAlignment="Stretch"
                 VerticalContentAlignment="Stretch" />
         </NavigationView>
 
-        <Border
-            Grid.Row="1"
-            Padding="12,8"
-            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-            BorderThickness="0,1,0,0">
-            <Grid>
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <MenuFlyoutSeparator />
+            <Grid Grid.Row="1" Padding="24,8" ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -76,12 +101,40 @@
                 <TextBlock TextWrapping="Wrap" Text="{x:Bind ViewModel.Message, Mode=OneWay}" />
                 <TextBlock
                     Grid.Column="1"
-                    Margin="12,0,0,0"
+                    VerticalAlignment="Center"
                     DataContext="{x:Bind ViewModel}"
-                    FontWeight="SemiBold"
                     Text="有未保存更改"
                     Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVis}}" />
             </Grid>
-        </Border>
+        </Grid>
+
+        <tb:TaskbarIcon
+            x:Name="TrayIcon"
+            Grid.RowSpan="3"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            ContextMenuMode="SecondWindow"
+            IconSource="ms-appx:///Branding/AppIcon.ico"
+            LeftClickCommand="{x:Bind ShowWindowCommand}"
+            NoLeftClickDelay="True"
+            ToolTipText="{x:Bind ViewModel.TrayText, Mode=OneWay}">
+            <tb:TaskbarIcon.ContextFlyout>
+                <MenuFlyout>
+                    <MenuFlyoutItem
+                        Command="{x:Bind ShowWindowCommand}"
+                        Text="显示主窗口" />
+                    <MenuFlyoutItem
+                        Command="{x:Bind ViewModel.StartCoreCommand}"
+                        Text="启动/重启内核" />
+                    <MenuFlyoutItem
+                        Command="{x:Bind ViewModel.StopCoreCommand}"
+                        Text="停止内核" />
+                    <MenuFlyoutSeparator />
+                    <MenuFlyoutItem
+                        Command="{x:Bind ExitCommand}"
+                        Text="退出" />
+                </MenuFlyout>
+            </tb:TaskbarIcon.ContextFlyout>
+        </tb:TaskbarIcon>
     </Grid>
 </Window>

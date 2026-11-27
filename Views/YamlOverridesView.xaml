@@ -6,24 +6,39 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid Padding="12" RowSpacing="8">
+    <Grid Padding="24" RowSpacing="12">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <TextBlock TextWrapping="Wrap" Text="对订阅配置进行 YAML 深度合并。key! 强制整体覆盖对象；+key 前置数组；key+ 追加数组。" />
+        <TextBlock
+            AutomationProperties.HeadingLevel="Level1"
+            Style="{StaticResource TitleTextBlockStyle}"
+            Text="YAML 覆写" />
 
-        <Border Grid.Row="1" Style="{StaticResource Card}">
+        <TextBlock
+            Grid.Row="1"
+            Text="对订阅配置进行 YAML 深度合并。key! 强制整体覆盖对象；+key 前置数组；key+ 追加数组。"
+            TextWrapping="Wrap" />
+
+        <Expander
+            Grid.Row="2"
+            Header="覆写内容"
+            HorizontalAlignment="Stretch"
+            HorizontalContentAlignment="Stretch"
+            IsExpanded="True"
+            VerticalContentAlignment="Stretch">
             <TextBox
                 x:Name="OverridesTextBox"
                 AcceptsReturn="True"
-                FontFamily="Consolas"
                 KeyDown="OverridesTextBox_KeyDown"
+                MinHeight="400"
                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
                 ScrollViewer.VerticalScrollBarVisibility="Auto"
                 Text="{x:Bind ViewModel.Settings.RuleOverrides, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                 TextWrapping="NoWrap" />
-        </Border>
+        </Expander>
     </Grid>
 </UserControl>

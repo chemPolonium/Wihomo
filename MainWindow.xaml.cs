@@ -1,13 +1,16 @@
+using CommunityToolkit.Mvvm.Input;
+using Microsoft.UI;
+using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Wihomo.Services;
 using Wihomo.ViewModels;
 using Wihomo.Views;
 using Windows.Graphics;
-using Drawing = System.Drawing;
-using Forms = System.Windows.Forms;
+using Windows.UI;
 
 namespace Wihomo;
 
@@ -23,31 +26,34 @@ public sealed partial class MainWindow : Window
     private const int MinimumHeight = 620;
 
     private readonly Dictionary<string, UserControl> _views = new(StringComparer.Ordinal);
-    private readonly Drawing.Icon _applicationIcon;
-    private readonly Forms.NotifyIcon _notifyIcon;
     private bool _isExiting;
     private bool _uiDisposed;
     private bool _initialSizeApplied;
 
     public MainViewModel ViewModel { get; }
 
+    public string DisplayName { get; } = AppInstance.DisplayName;
+
+    public IRelayCommand ShowWindowCommand { get; }
+
+    public IRelayCommand ExitCommand { get; }
+
     public MainWindow()
     {
+        ShowWindowCommand = new RelayCommand(ShowMainWindow);
+        ExitCommand = new RelayCommand(ExitApplication);
+
         ViewModel = new MainViewModel(new WinUiDispatcher(DispatcherQueue));
         InitializeComponent();
 
-        // 并行调试实例在标题、导航栏和托盘上都带后缀，避免和旧版混淆。
+        // 并行调试实例的标题、标题栏和托盘提示都带后缀，避免和旧版混淆。
         Title = AppInstance.DisplayName;
-        Navigation.PaneTitle = AppInstance.DisplayName;
 
         ConfigureWindow();
-
-        _applicationIcon = LoadApplicationIcon();
-        _notifyIcon = CreateNotifyIcon(_applicationIcon);
+        ConfigureTitleBar();
 
         AppWindow.Closing += AppWindow_Closing;
         Root.Loaded += Root_Loaded;
-        ViewModel.PropertyChanged += ViewModel_PropertyChanged;
 
         Navigation.SelectedItem = Navigation.MenuItems[0];
     }
@@ -101,6 +107,45 @@ public sealed partial class MainWindow : Window
         {
             AppWindow.SetIcon(iconPath);
         }
+    }
+
+    private void ConfigureTitleBar()
+    {
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+        AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
+
+        if (!MicaController.IsSupported())
+        {
+            SystemBackdrop = DesktopAcrylicController.IsSupported()
+                ? new DesktopAcrylicBackdrop()
+                : null;
+
+            if (SystemBackdrop is null)
+            {
+                Root.Background = (Brush)Application.Current.Resources["ApplicationPageBackgroundThemeBrush"];
+            }
+        }
+
+        ApplyTitleBarTheme();
+        Root.ActualThemeChanged += (_, _) => ApplyTitleBarTheme();
+    }
+
+    private void ApplyTitleBarTheme()
+    {
+        var foreground = Root.ActualTheme == ElementTheme.Dark ? Colors.White : Colors.Black;
+        AppWindow.TitleBar.ButtonForegroundColor = foreground;
+        AppWindow.TitleBar.ButtonHoverForegroundColor = foreground;
+        AppWindow.TitleBar.ButtonHoverBackgroundColor = Root.ActualTheme == ElementTheme.Dark
+            ? Color.FromArgb(24, 255, 255, 255)
+            : Color.FromArgb(24, 0, 0, 0);
+        AppWindow.TitleBar.ButtonBackgroundColor = Colors.Transparent;
+        AppWindow.TitleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+    }
+
+    private void TitleBar_PaneToggleRequested(TitleBar sender, object args)
+    {
+        Navigation.IsPaneOpen = !Navigation.IsPaneOpen;
     }
 
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
@@ -167,45 +212,6 @@ public sealed partial class MainWindow : Window
         Activate();
     }
 
-    private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(MainViewModel.CoreStatusText))
-        {
-            _notifyIcon.Text = ViewModel.TrayText;
-        }
-    }
-
-    private static Drawing.Icon LoadApplicationIcon()
-    {
-        var path = Path.Combine(AppContext.BaseDirectory, "Branding", "AppIcon.ico");
-        if (!File.Exists(path))
-        {
-            path = Path.Combine(AppContext.BaseDirectory, "Wihomo.ico");
-        }
-
-        return new Drawing.Icon(path);
-    }
-
-    private Forms.NotifyIcon CreateNotifyIcon(Drawing.Icon applicationIcon)
-    {
-        var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add("显示主窗口", null, (_, _) => ShowMainWindow());
-        menu.Items.Add("启动/重启内核", null, (_, _) => InvokeOnUi(() => ViewModel.StartCoreCommand.Execute(null)));
-        menu.Items.Add("停止内核", null, (_, _) => InvokeOnUi(() => ViewModel.StopCoreCommand.Execute(null)));
-        menu.Items.Add(new Forms.ToolStripSeparator());
-        menu.Items.Add("退出", null, (_, _) => InvokeOnUi(ExitApplication));
-
-        var notifyIcon = new Forms.NotifyIcon
-        {
-            Icon = applicationIcon,
-            Text = ViewModel.TrayText,
-            ContextMenuStrip = menu,
-            Visible = true
-        };
-        notifyIcon.DoubleClick += (_, _) => ShowMainWindow();
-        return notifyIcon;
-    }
-
     private void HideToNotificationArea()
     {
         AppWindow.Hide();
@@ -214,11 +220,6 @@ public sealed partial class MainWindow : Window
     private void ShowMainWindow()
     {
         DispatcherQueue.TryEnqueue(RestoreAndActivate);
-    }
-
-    private void InvokeOnUi(Action action)
-    {
-        DispatcherQueue.TryEnqueue(() => action());
     }
 
     private void ExitApplication()
@@ -241,9 +242,7 @@ public sealed partial class MainWindow : Window
         }
 
         _uiDisposed = true;
-        _notifyIcon.Visible = false;
-        _notifyIcon.Dispose();
-        _applicationIcon.Dispose();
+        TrayIcon.Dispose();
         ViewModel.PrepareForExit();
         ViewModel.Dispose();
     }

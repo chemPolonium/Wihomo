@@ -7,118 +7,81 @@
     mc:Ignorable="d">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Padding="12" Spacing="12">
-            <Border Style="{StaticResource Card}">
-                <Grid RowSpacing="8" ColumnSpacing="8">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="180" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock Style="{StaticResource FormLabel}" Text="内核可执行文件路径" />
+        <StackPanel Padding="24" Spacing="16">
+            <TextBlock
+                AutomationProperties.HeadingLevel="Level1"
+                Style="{StaticResource TitleTextBlockStyle}"
+                Text="内核设置" />
+            <Expander
+                Header="基本配置"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Stretch"
+                IsExpanded="True">
+                <StackPanel Spacing="16">
                     <TextBox
-                        Grid.Column="1"
+                        Header="内核可执行文件路径"
                         Text="{x:Bind ViewModel.Settings.CorePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="1" Style="{StaticResource FormLabel}" Text="工作目录" />
                     <TextBox
-                        Grid.Row="1"
-                        Grid.Column="1"
+                        Header="工作目录"
                         Text="{x:Bind ViewModel.Settings.CoreWorkDir, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="2" Style="{StaticResource FormLabel}" Text="External Controller Host" />
                     <TextBox
-                        Grid.Row="2"
-                        Grid.Column="1"
+                        Header="External Controller Host"
                         Text="{x:Bind ViewModel.Settings.ControllerHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="3" Style="{StaticResource FormLabel}" Text="External Controller Port" />
                     <TextBox
-                        Grid.Row="3"
-                        Grid.Column="1"
+                        Header="External Controller Port"
+                        InputScope="Number"
                         Text="{x:Bind ViewModel.Settings.ControllerPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="4" Style="{StaticResource FormLabel}" Text="Mixed Port" />
                     <TextBox
-                        Grid.Row="4"
-                        Grid.Column="1"
+                        Header="Mixed Port"
+                        InputScope="Number"
                         Text="{x:Bind ViewModel.Settings.MixedPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="5" Style="{StaticResource FormLabel}" Text="SOCKS Port" />
                     <TextBox
-                        Grid.Row="5"
-                        Grid.Column="1"
+                        Header="SOCKS Port"
+                        InputScope="Number"
                         Text="{x:Bind ViewModel.Settings.SocksPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="6" Style="{StaticResource FormLabel}" Text="HTTP Port" />
                     <TextBox
-                        Grid.Row="6"
-                        Grid.Column="1"
+                        Header="HTTP Port"
+                        InputScope="Number"
                         Text="{x:Bind ViewModel.Settings.HttpPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="7" Style="{StaticResource FormLabel}" Text="Secret" />
                     <TextBox
-                        Grid.Row="7"
-                        Grid.Column="1"
+                        Header="Secret"
                         Text="{x:Bind ViewModel.Settings.Secret, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBlock Grid.Row="8" Style="{StaticResource FormLabel}" Text="统计刷新间隔(秒)" />
                     <TextBox
-                        Grid.Row="8"
-                        Grid.Column="1"
+                        Header="统计刷新间隔（秒）"
+                        InputScope="Number"
                         Text="{x:Bind ViewModel.Settings.StatsRefreshText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <CheckBox
-                        Grid.Row="9"
-                        Grid.Column="1"
-                        Content="启动程序时自动启动内核"
-                        IsChecked="{x:Bind ViewModel.Settings.StartCoreOnProgramStart, Mode=TwoWay}" />
-
-                    <CheckBox
-                        Grid.Row="10"
-                        Grid.Column="1"
-                        Content="登录用户时启动 Wihomo"
-                        IsChecked="{x:Bind ViewModel.Settings.StartWithWindows, Mode=TwoWay}"
-                        IsEnabled="{x:Bind ViewModel.Settings.CanStartWithWindows}" />
-
-                    <CheckBox
-                        Grid.Row="11"
-                        Grid.Column="1"
-                        Content="启动内核时启用系统代理，停止内核时关闭"
-                        IsChecked="{x:Bind ViewModel.Settings.EnableSystemProxy, Mode=TwoWay}" />
-
-                    <CheckBox
-                        Grid.Row="12"
-                        Grid.Column="1"
-                        Content="让本地与局域网连接绕过代理"
-                        IsChecked="{x:Bind ViewModel.Settings.BypassLocalNetworks, Mode=TwoWay}"
-                        ToolTipService.ToolTip="内网 IP 与 .lan/.local/.home.arpa 域名直连，打印机/NAS/路由器不经过代理" />
+                    <StackPanel Spacing="8">
+                        <CheckBox
+                            Content="启动程序时自动启动内核"
+                            IsChecked="{x:Bind ViewModel.Settings.StartCoreOnProgramStart, Mode=TwoWay}" />
+                        <CheckBox
+                            Content="登录用户时启动 Wihomo"
+                            IsChecked="{x:Bind ViewModel.Settings.StartWithWindows, Mode=TwoWay}"
+                            IsEnabled="{x:Bind ViewModel.Settings.CanStartWithWindows}" />
+                        <CheckBox
+                            Content="启动内核时启用系统代理，停止内核时关闭"
+                            IsChecked="{x:Bind ViewModel.Settings.EnableSystemProxy, Mode=TwoWay}" />
+                        <CheckBox
+                            Content="让本地与局域网连接绕过代理"
+                            IsChecked="{x:Bind ViewModel.Settings.BypassLocalNetworks, Mode=TwoWay}"
+                            ToolTipService.ToolTip="内网 IP 与 .lan/.local/.home.arpa 域名直连，打印机/NAS/路由器不经过代理" />
+                    </StackPanel>
 
                     <Button
-                        Grid.Row="13"
-                        Grid.Column="1"
-                        MinWidth="130"
                         HorizontalAlignment="Left"
                         Content="保存设置"
                         Command="{x:Bind ViewModel.SaveSettingsCommand}" />
-                </Grid>
-            </Border>
+                </StackPanel>
+            </Expander>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

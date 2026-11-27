@@ -28,6 +28,9 @@ public sealed class ProxyGroupViewModel(ProxyGroupInfo info, bool showCurrentInH
         ? $"{Name} [{Type}] -> {Current}"
         : $"{Name} [{Type}]";
 
+    /// <summary>列表第二行：协议类型与当前节点。</summary>
+    public string Subtitle => string.IsNullOrWhiteSpace(Current) ? Type : $"{Type} · {Current}";
+
     public ProxyMemberViewModel? LoadMembers(IEnumerable<string> options, Func<string, string> delayOf, string? preferred)
     {
         Members.Clear();
@@ -51,6 +54,7 @@ public sealed partial class ProxyGroupsViewModel : ObservableObject
     [ObservableProperty] private string _selectedGroupStatusText = "当前组: -";
     [ObservableProperty] private string _currentSelectionText = "当前选择: -";
     [ObservableProperty] private string _allDelayStatusText = "等待测速";
+    [ObservableProperty] private bool _isTestingAllDelays;
     [ObservableProperty] private string _delayTestUrl = "http://cp.cloudflare.com/generate_204";
     [ObservableProperty] private string _delayTestTimeoutText = "5000";
 
@@ -81,6 +85,7 @@ public sealed partial class ProxyGroupsViewModel : ObservableObject
         SelectedMember = null;
         SelectedGroupStatusText = "当前组: -";
         CurrentSelectionText = "当前选择: -";
+        IsTestingAllDelays = false;
     }
 
     /// <summary>测速结果落地后刷新当前组的延迟列，并保持所选节点不变。</summary>
