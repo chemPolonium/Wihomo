@@ -1,4 +1,5 @@
 using System.IO;
+using System.Reflection;
 using System.Text.Json;
 using Wihomo.Models;
 using Wihomo.Services;
@@ -21,7 +22,7 @@ public class MainViewModelSubscriptionTests : IDisposable
 
     public MainViewModelSubscriptionTests()
     {
-        _directory = Path.Combine(Path.GetTempPath(), $"wihomo-tests-{Guid.NewGuid():N}");
+        _directory = Path.Combine(TestPaths.TempRoot, $"wihomo-tests-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_directory);
         _settingsPath = Path.Combine(_directory, "settings.json");
         WriteSettings(TwoSubscriptionSettings(_directory));
@@ -78,6 +79,45 @@ public class MainViewModelSubscriptionTests : IDisposable
 
         Assert.Contains("请先选择要删除的订阅", _viewModel.Message);
         Assert.Equal(before, File.ReadAllText(_settingsPath));
+    }
+
+    [Fact]
+    public async Task CloneSettings_深拷贝所有嵌套对象()
+    {
+        await _viewModel.InitializeAsync();
+
+        var cloneMethod = typeof(MainViewModel).GetMethod(
+            "CloneSettings",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("CloneSettings 方法不存在。");
+        var settingsField = typeof(MainViewModel).GetField(
+            "_settings",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("_settings 字段不存在。");
+
+        var original = (AppSettings)settingsField.GetValue(_viewModel)!;
+        var clone = (AppSettings)cloneMethod.Invoke(_viewModel, null)!;
+
+        Assert.NotSame(original, clone);
+        Assert.NotSame(original.Core, clone.Core);
+        Assert.NotSame(original.Dns, clone.Dns);
+        Assert.NotSame(original.Dns.FakeIpFilter, clone.Dns.FakeIpFilter);
+        Assert.NotSame(original.Dns.DefaultNameserver, clone.Dns.DefaultNameserver);
+        Assert.NotSame(original.Dns.Nameserver, clone.Dns.Nameserver);
+        Assert.NotSame(original.Dns.Fallback, clone.Dns.Fallback);
+        Assert.NotSame(original.Dns.FallbackFilterIpCidr, clone.Dns.FallbackFilterIpCidr);
+        Assert.NotSame(original.GeoxUrls, clone.GeoxUrls);
+        Assert.NotSame(original.Subscriptions, clone.Subscriptions);
+        Assert.NotSame(original.Subscriptions[0], clone.Subscriptions[0]);
+        Assert.NotSame(original.SubscriptionRules, clone.SubscriptionRules);
+
+        clone.Dns.Nameserver.Add("9.9.9.9");
+        clone.Subscriptions[0].Name = "已修改";
+        clone.SubscriptionRules.Add("MATCH,DIRECT");
+
+        Assert.DoesNotContain("9.9.9.9", original.Dns.Nameserver);
+        Assert.NotEqual("已修改", original.Subscriptions[0].Name);
+        Assert.Empty(original.SubscriptionRules);
     }
 
     public void Dispose()

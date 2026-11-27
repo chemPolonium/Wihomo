@@ -72,7 +72,7 @@ public class SubscriptionParserTests
     [Fact]
     public void Parse_ProxyUriListWithoutRules_ReturnsEmpty()
     {
-        var content = "ss://YWVzLTI1Ni1nY206cGFzcw==@1.2.3.4:8388#HK\nvmess://abcdef";
+        var content = "ss://YWVzLTI1Ni1nY206cGFzcw==@1.2.3.4:8388#HK\nvless://uuid@5.6.7.8:443#JP";
 
         Assert.Empty(SubscriptionParser.Parse(content).Rules);
     }
@@ -148,6 +148,32 @@ public class SubscriptionParserTests
         const string text = "YWJjZA==";
 
         Assert.Equal(text, SubscriptionParser.DecodeSubscriptionText(text));
+    }
+}
+
+public class SubscriptionFormatConverterTests
+{
+    [Fact]
+    public void Convert_VmessUri_IsNoLongerSupported()
+    {
+        var result = new SubscriptionFormatConverter().Convert(
+            "vmess://eyJ2IjoiMiIsInBzIjoiSFoiLCJhZGQiOiIxLjIuMy40IiwicG9ydCI6IjQ0MyJ9");
+
+        Assert.Equal(SubscriptionFormat.Unknown, result.Format);
+    }
+
+    [Fact]
+    public void Convert_ProxyUriList_SkipsVmessAndKeepsSupportedNodes()
+    {
+        var result = new SubscriptionFormatConverter().Convert(
+            "ss://YWVzLTI1Ni1nY206cGFzcw==@1.2.3.4:8388#HK\n" +
+            "vmess://eyJ2IjoiMiIsInBzIjoiSFoiLCJhZGQiOiIxLjIuMy40IiwicG9ydCI6IjQ0MyJ9\n" +
+            "vless://uuid@5.6.7.8:443#JP");
+
+        Assert.Equal(SubscriptionFormat.ConvertedFromUris, result.Format);
+        Assert.DoesNotContain("vmess", result.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("HK", result.Content);
+        Assert.Contains("JP", result.Content);
     }
 }
 

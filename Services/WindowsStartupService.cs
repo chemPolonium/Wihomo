@@ -1,28 +1,54 @@
-using Microsoft.Win32;
+using Windows.ApplicationModel;
 
 namespace Wihomo.Services;
 
+/// <summary>
+/// MSIX 打包应用不能依赖注册表 Run 项，改用清单里的 startupTask 扩展。
+/// </summary>
 public sealed class WindowsStartupService
 {
-    private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string ValueName = "Wihomo";
+    private const string TaskId = "WihomoStartup";
 
-    public void SetEnabled(bool enabled)
+    /// <summary>返回系统最终生效的启用状态；被策略或任务管理器禁用时可能仍为 false。</summary>
+    public async Task<bool> SetEnabledAsync(bool enabled)
     {
-        using var runKey = Registry.CurrentUser.CreateSubKey(RunKeyPath, writable: true);
-
-        if (enabled)
+        // 并行调试实例绝不动系统启动项：旧版仍在用同一个 startupTask 语义，
+        // 关掉它会让用户以为自己安装的正式版失效。
+        if (AppInstance.IsIsolated)
         {
-            var executablePath = Environment.ProcessPath;
-            if (string.IsNullOrWhiteSpace(executablePath))
-            {
-                throw new InvalidOperationException("无法确定当前程序的可执行文件路径。");
-            }
-
-            runKey.SetValue(ValueName, $"\"{executablePath}\"", RegistryValueKind.String);
-            return;
+            return false;
         }
 
-        runKey.DeleteValue(ValueName, throwOnMissingValue: false);
+        StartupTask task;
+        try
+        {
+            task = await StartupTask.GetAsync(TaskId);
+        }
+        catch (Exception) when (!HasPackageIdentity())
+        {
+            return false;
+        }
+
+        if (!enabled)
+        {
+            task.Disable();
+            return false;
+        }
+
+        var state = await task.RequestEnableAsync();
+        return state is StartupTaskState.Enabled or StartupTaskState.EnabledByPolicy;
+    }
+
+    private static bool HasPackageIdentity()
+    {
+        try
+        {
+            _ = Package.Current;
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 }

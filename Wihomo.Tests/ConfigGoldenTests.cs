@@ -13,11 +13,11 @@ public class MihomoConfigBuilderGoldenTests
     }
 
     [Fact]
-    public void Build_TwoProvidersCustomRulesTun_MatchesGolden()
+    public void Build_TwoProvidersCustomRules_MatchesGolden()
     {
         var actual = new MihomoConfigBuilder()
-            .Build(Fixtures.TwoProvidersCustomRulesTun(), Fixtures.LocalProviderKeys());
-        GoldenMaster.Verify(nameof(Build_TwoProvidersCustomRulesTun_MatchesGolden), actual);
+            .Build(Fixtures.TwoProvidersCustomRules(), Fixtures.LocalProviderKeys());
+        GoldenMaster.Verify(nameof(Build_TwoProvidersCustomRules_MatchesGolden), actual);
     }
 
     [Fact]
@@ -65,5 +65,15 @@ public class SubscriptionConfigComposerGoldenTests
         var actual = new SubscriptionConfigComposer()
             .Compose(Fixtures.SubscriptionYaml, Fixtures.ComposeLocalBypass());
         GoldenMaster.Verify(nameof(Compose_LocalBypass_MatchesGolden), actual);
+    }
+
+    [Fact]
+    public void Compose_RemovesTunSectionFromSubscription()
+    {
+        var yaml = Fixtures.SubscriptionYaml + "\ntun:\n  enable: true\n  stack: system\n";
+
+        var result = new SubscriptionConfigComposer().Compose(yaml, Fixtures.ComposeBase());
+
+        Assert.DoesNotContain("tun:", result, StringComparison.Ordinal);
     }
 }

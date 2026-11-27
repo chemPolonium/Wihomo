@@ -40,7 +40,6 @@ public sealed partial class TelemetryViewModel : ObservableObject
     [ObservableProperty] private string _downloadRateText = "下载速率: -";
     [ObservableProperty] private string _uploadRateText = "上传速率: -";
     [ObservableProperty] private string _systemProxyStatusText = "系统代理: 未启用";
-    [ObservableProperty] private string _tunStatusText = "TUN: 未启用";
     [ObservableProperty] private bool _isCoreRunning;
 
     public ObservableCollection<ConnectionRowViewModel> Connections { get; } = [];
@@ -73,12 +72,11 @@ public sealed partial class TelemetryViewModel : ObservableObject
         Connections.Clear();
     }
 
-    public void UpdateRuntimeIndicators(bool systemProxyEnabled, int mixedPort, bool tunEnabled, string tunStack)
+    public void UpdateRuntimeIndicators(bool systemProxyEnabled, int mixedPort)
     {
         SystemProxyStatusText = systemProxyEnabled
             ? $"系统代理: 已配置为启动时启用 ({mixedPort})"
             : "系统代理: 未启用";
-        TunStatusText = tunEnabled ? $"TUN: 已启用 ({tunStack})" : "TUN: 未启用";
     }
 
     private void ApplyConnections(CoreConnection[]? incoming)

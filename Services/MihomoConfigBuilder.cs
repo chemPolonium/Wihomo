@@ -31,13 +31,6 @@ public sealed class MihomoConfigBuilder
         sb.AppendLine("  store-selected: true");
         sb.AppendLine("  store-fake-ip: true");
         sb.AppendLine();
-        sb.AppendLine("tun:");
-        sb.AppendLine($"  enable: {settings.Core.EnableTun.ToString().ToLowerInvariant()}");
-        sb.AppendLine($"  stack: {NormalizeTunStack(settings.Core.TunStack)}");
-        sb.AppendLine("  auto-route: true");
-        sb.AppendLine("  auto-detect-interface: true");
-        sb.AppendLine("  strict-route: true");
-        sb.AppendLine();
 
         if (settings.Dns.Enable)
         {
@@ -290,16 +283,6 @@ public sealed class MihomoConfigBuilder
     private static string EscapeYamlString(string value)
     {
         return $"'{value.Replace("'", "''")}'";
-    }
-
-    private static string NormalizeTunStack(string value)
-    {
-        return value switch
-        {
-            "system" => "system",
-            "gvisor" => "gvisor",
-            _ => "mixed"
-        };
     }
 
     private static IEnumerable<string> ExtractRulePolicyNames(IEnumerable<string> rules)

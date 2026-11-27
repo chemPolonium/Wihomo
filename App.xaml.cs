@@ -1,18 +1,27 @@
-using System.IO;
 using System.IO.Pipes;
-using System.Windows;
+using System.Runtime.InteropServices;
+using Microsoft.UI.Xaml;
+using Wihomo.Services;
 
 namespace Wihomo;
 
-public partial class App : System.Windows.Application
+public partial class App : Application
 {
-    private const string SingleInstanceMutexName = @"Local\Wihomo.SingleInstance";
-    private const string ActivationPipeName = "Wihomo.Activation";
+    // 实例名、设置目录与端口都收敛到 AppInstance：默认实例与旧版互斥，
+    // 设置 WIHOMO_INSTANCE_SUFFIX 时派生一个可并行运行的独立实例。
+    private static string SingleInstanceMutexName => AppInstance.SingleInstanceMutexName;
+    private static string ActivationPipeName => AppInstance.ActivationPipeName;
 
     private Mutex? _singleInstanceMutex;
     private CancellationTokenSource? _activationCancellation;
+    private MainWindow? _mainWindow;
 
-    protected override void OnStartup(StartupEventArgs e)
+    public App()
+    {
+        InitializeComponent();
+    }
+
+    protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var createdNew);
         if (!createdNew)
@@ -27,26 +36,25 @@ public partial class App : System.Windows.Application
                 _singleInstanceMutex = null;
             }
 
-            Shutdown();
+            Exit();
             return;
         }
 
-        base.OnStartup(e);
-
-        var mainWindow = new MainWindow();
-        MainWindow = mainWindow;
         _activationCancellation = new CancellationTokenSource();
         _ = Task.Run(() => ListenForActivationAsync(_activationCancellation.Token));
-        mainWindow.Show();
+
+        _mainWindow = new MainWindow();
+        _mainWindow.Closed += MainWindow_Closed;
+        _mainWindow.Activate();
     }
 
-    protected override void OnExit(ExitEventArgs e)
+    private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
         _activationCancellation?.Cancel();
         _activationCancellation?.Dispose();
-        _singleInstanceMutex?.ReleaseMutex();
+        _activationCancellation = null;
         _singleInstanceMutex?.Dispose();
-        base.OnExit(e);
+        _singleInstanceMutex = null;
     }
 
     private static void SignalExistingInstance()
@@ -58,19 +66,11 @@ public partial class App : System.Windows.Application
         }
         catch (TimeoutException ex)
         {
-            System.Windows.MessageBox.Show(
-                $"无法连接到已运行的 Wihomo：{ex.Message}",
-                "Wihomo",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            ShowWarning($"无法连接到已运行的 Wihomo：{ex.Message}");
         }
         catch (IOException ex)
         {
-            System.Windows.MessageBox.Show(
-                $"无法连接到已运行的 Wihomo：{ex.Message}",
-                "Wihomo",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            ShowWarning($"无法连接到已运行的 Wihomo：{ex.Message}");
         }
     }
 
@@ -94,15 +94,18 @@ public partial class App : System.Windows.Application
                 break;
             }
 
-            await Dispatcher.InvokeAsync(ActivateMainWindow);
+            _mainWindow?.DispatcherQueue.TryEnqueue(() => _mainWindow.RestoreAndActivate());
         }
     }
 
-    private void ActivateMainWindow()
+    private static void ShowWarning(string message)
     {
-        if (MainWindow is MainWindow mainWindow)
-        {
-            mainWindow.RestoreAndActivate();
-        }
+        var owner = IntPtr.Zero;
+        MessageBoxW(owner, message, AppInstance.DisplayName, MbIconWarning);
     }
+
+    private const uint MbIconWarning = 0x00000030;
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = false)]
+    private static extern int MessageBoxW(IntPtr hWnd, string text, string caption, uint type);
 }

@@ -1,16 +1,38 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <UseWPF>true</UseWPF>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <!-- 测试夹具文件名里的版本号会被 PRI 当成资源限定符，测试工程不需要 PRI -->
+    <AppxGeneratePriEnabled>false</AppxGeneratePriEnabled>
+    <!--
+      vstest 的 testhost 以 Low 完整性级别运行，启动时却会用 OpenProcess 监视
+      parentprocessid 指向的 Medium 父进程，权限不足会直接崩溃。TestPlatform 18.x
+      提供了该开关；Microsoft.NET.Test.Sdk 默认写 true，这里必须在包 targets 之前覆盖。
+    -->
+    <_MSTestEnableParentProcessQuery>false</_MSTestEnableParentProcessQuery>
   </PropertyGroup>
+
+  <!--
+    testhost 以 Low 完整性运行，只能写入同样标记为 Low 的目录。
+    在输出目录准备一个 TestTemp 并打上 Low 标签，供 TestPaths.TempRoot 使用。
+  -->
+  <Target Name="CreateLowIntegrityTestTemp" AfterTargets="Build">
+    <MakeDir Directories="$(OutDir)TestTemp" />
+    <Exec
+      Command="icacls &quot;$(OutDir)TestTemp&quot; /setintegritylevel (OI)(CI)Low"
+      StandardOutputImportance="Low"
+      StandardErrorImportance="High" />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.2" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>

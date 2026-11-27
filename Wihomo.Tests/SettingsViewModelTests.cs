@@ -25,8 +25,6 @@ public class SettingsViewModelTests
         Assert.Equal(17892, target.Core.HttpPort);
         Assert.Equal("sekret", target.Core.Secret);
         Assert.True(target.Core.EnableSystemProxy);
-        Assert.True(target.Core.EnableTun);
-        Assert.Equal("gvisor", target.Core.TunStack);
         Assert.Equal(3, target.StatsRefreshSeconds);
         Assert.False(target.StartCoreOnProgramStart);
         Assert.True(target.StartWithWindows);
@@ -52,7 +50,6 @@ public class SettingsViewModelTests
         vm.LoadFrom(NewPopulatedSettings());
 
         Assert.Equal("19090", vm.ControllerPortText);
-        Assert.Equal("gvisor", vm.SelectedTunStack.Value);
         Assert.Equal("DAT", vm.SelectedGeoDataMode.Display);
         Assert.Equal("redir-host", vm.SelectedDnsEnhancedMode.Display);
         Assert.Equal(string.Join(Environment.NewLine, ["223.5.5.5", "119.29.29.29"]), vm.DefaultNameserverText);
@@ -144,21 +141,6 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public void 未知的TunStack_回落为mixed()
-    {
-        // 记录在案的既有缺陷：内核接受大小写混合的 stack 名，界面却按 Ordinal 精确匹配。
-        // 迁移前 SelectTunStack 的 switch 同样把无法识别的值归为 mixed，这里锁定行为未被改坏。
-        var settings = new AppSettings();
-        settings.Core.TunStack = "System";
-
-        var vm = new SettingsViewModel();
-        vm.LoadFrom(settings);
-
-        Assert.Equal("mixed", vm.SelectedTunStack.Value);
-        Assert.Equal("mixed", vm.SelectedTunStack.Display);
-    }
-
-    [Fact]
     public void 端口为负数时拒绝写回()
     {
         var settings = NewPopulatedSettings();
@@ -192,8 +174,6 @@ public class SettingsViewModelTests
         settings.Core.HttpPort = 17892;
         settings.Core.Secret = "sekret";
         settings.Core.EnableSystemProxy = true;
-        settings.Core.EnableTun = true;
-        settings.Core.TunStack = "gvisor";
 
         settings.GeoxUrls.GeoIp = "https://geo/geoip.dat";
         settings.GeoxUrls.GeoSite = "https://geo/geosite.dat";

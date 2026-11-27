@@ -3,3 +3,9 @@ obj/
 artifacts/
 tmp-mihomo-test/
 mihomo-src/
+
+# 构建/测试产生的诊断与日志
+*.log
+*.bak
+TestResults/
+*.received.txt

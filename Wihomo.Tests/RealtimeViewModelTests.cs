@@ -114,13 +114,11 @@ public class TelemetryViewModelTests
     {
         var vm = new TelemetryViewModel();
 
-        vm.UpdateRuntimeIndicators(true, 7890, true, "system");
+        vm.UpdateRuntimeIndicators(true, 7890);
         Assert.Equal("系统代理: 已配置为启动时启用 (7890)", vm.SystemProxyStatusText);
-        Assert.Equal("TUN: 已启用 (system)", vm.TunStatusText);
 
-        vm.UpdateRuntimeIndicators(false, 7890, false, "mixed");
+        vm.UpdateRuntimeIndicators(false, 7890);
         Assert.Equal("系统代理: 未启用", vm.SystemProxyStatusText);
-        Assert.Equal("TUN: 未启用", vm.TunStatusText);
     }
 
     private static ConnectionsFrame Frame(params CoreConnection[] connections) => new() { Connections = connections };

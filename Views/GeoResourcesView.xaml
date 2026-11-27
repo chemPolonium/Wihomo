@@ -1,0 +1,88 @@
+<UserControl
+    x:Class="Wihomo.Views.GeoResourcesView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Padding="12" Spacing="12">
+            <Border Style="{StaticResource Card}">
+                <StackPanel Spacing="8">
+                    <TextBlock TextWrapping="Wrap" Text="由 mihomo 负责下载和自动更新 GEO 数据库；此页面仅配置下载地址与更新策略。" />
+
+                    <Grid RowSpacing="8" ColumnSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Style="{StaticResource FormLabel}" Text="GeoIP 数据库" />
+                        <TextBox
+                            Grid.Column="1"
+                            Text="{x:Bind ViewModel.Settings.GeoIpUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Grid.Row="1" Style="{StaticResource FormLabel}" Text="GeoSite 数据库" />
+                        <TextBox
+                            Grid.Row="1"
+                            Grid.Column="1"
+                            Text="{x:Bind ViewModel.Settings.GeoSiteUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Grid.Row="2" Style="{StaticResource FormLabel}" Text="MMDB 数据库" />
+                        <TextBox
+                            Grid.Row="2"
+                            Grid.Column="1"
+                            Text="{x:Bind ViewModel.Settings.MmdbUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Grid.Row="3" Style="{StaticResource FormLabel}" Text="ASN 数据库" />
+                        <TextBox
+                            Grid.Row="3"
+                            Grid.Column="1"
+                            Text="{x:Bind ViewModel.Settings.AsnUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Grid.Row="4" Style="{StaticResource FormLabel}" Text="Geodata 数据模式" />
+                        <ComboBox
+                            Grid.Row="4"
+                            Grid.Column="1"
+                            Width="180"
+                            HorizontalAlignment="Left"
+                            DisplayMemberPath="Display"
+                            ItemsSource="{x:Bind ViewModel.Settings.GeoDataModeOptionList}"
+                            SelectedItem="{x:Bind ViewModel.Settings.SelectedGeoDataMode, Mode=TwoWay}" />
+
+                        <StackPanel
+                            Grid.Row="5"
+                            Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <CheckBox VerticalAlignment="Center" Content="自动更新 GEO 数据" IsChecked="{x:Bind ViewModel.Settings.GeoAutoUpdate, Mode=TwoWay}" />
+                            <TextBlock Style="{StaticResource FormLabel}" Text="更新间隔（小时）" />
+                            <TextBox
+                                Width="80"
+                                Text="{x:Bind ViewModel.Settings.GeoUpdateIntervalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <StackPanel
+                            Grid.Row="6"
+                            Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="12">
+                            <Button MinWidth="190" Content="保存外部资源设置并生成配置" Command="{x:Bind ViewModel.SaveAllCommand}" />
+                            <Button MinWidth="140" Content="手动更新 GEO 数据" Command="{x:Bind ViewModel.ManualUpdateGeoDataCommand}" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

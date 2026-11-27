@@ -4,13 +4,13 @@ namespace Wihomo.Tests;
 
 /// <summary>
 /// 金标准测试的输入。刻意覆盖分支而非追求真实配置：
-/// 端口钳位、名称归一化、TUN 栈回退、GEO 间隔钳位、规则策略名去重、YAML 转义边界。
+/// 端口钳位、名称归一化、GEO 间隔钳位、规则策略名去重、YAML 转义边界。
 /// </summary>
 internal static class Fixtures
 {
     public static AppSettings DefaultsNoSubscription() => new();
 
-    public static AppSettings TwoProvidersCustomRulesTun() => new()
+    public static AppSettings TwoProvidersCustomRules() => new()
     {
         Core = new CoreRuntimeSettings
         {
@@ -21,8 +21,6 @@ internal static class Fixtures
             SocksPort = 7891,
             HttpPort = 7892,
             EnableSystemProxy = true,
-            EnableTun = true,
-            TunStack = "System",
         },
         Subscriptions =
         [
@@ -74,8 +72,6 @@ internal static class Fixtures
             SocksPort = -1,
             HttpPort = 1,
             EnableSystemProxy = false,
-            EnableTun = false,
-            TunStack = "bogus-stack",
         },
         Dns = new DnsSettings { Enable = false },
         GeoxUrls = new GeoxUrlSettings { GeoIp = "", GeoSite = "   ", Mmdb = "", Asn = "" },
@@ -99,7 +95,6 @@ internal static class Fixtures
             MixedPort = 7890,
             SocksPort = 7891,
             HttpPort = 7892,
-            TunStack = "gvisor",
         },
         Subscriptions =
         [
@@ -132,8 +127,6 @@ internal static class Fixtures
         Core = new CoreRuntimeSettings
         {
             EnableSystemProxy = true,
-            EnableTun = true,
-            TunStack = "system",
             BypassLocalNetworks = true,
         },
         SubscriptionRules =
@@ -186,14 +179,11 @@ rules:
 
 """;
 
-    public static AppSettings ComposeBase() => new()
-    {
-        Core = new CoreRuntimeSettings { TunStack = "system", EnableTun = true },
-    };
+    public static AppSettings ComposeBase() => new();
 
     public static AppSettings ComposeLocalBypass() => new()
     {
-        Core = new CoreRuntimeSettings { TunStack = "system", EnableTun = true, BypassLocalNetworks = true },
+        Core = new CoreRuntimeSettings { BypassLocalNetworks = true },
     };
 
     /// <summary>订阅自行声明了 nameserver-policy，程序不得覆盖。</summary>
@@ -212,7 +202,7 @@ rules:
 
     public static AppSettings ComposeWithOverrides() => new()
     {
-        Core = new CoreRuntimeSettings { TunStack = "system", EnableTun = true, MixedPort = 7890 },
+        Core = new CoreRuntimeSettings { MixedPort = 7890 },
         RuleOverrides = """
 <mixed-port>: 1
 +proxies:

@@ -46,7 +46,7 @@ public sealed class RulesViewModel
 /// </summary>
 public sealed class LogsViewModel
 {
-    private const int MaxLines = 500;
+    public const int MaxLines = 500;
     private readonly List<string> _lines = [];
 
     /// <summary>新增一行时触发；由 View 负责把文本增量写入控件并滚动。</summary>

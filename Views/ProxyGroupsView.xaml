@@ -1,0 +1,124 @@
+<UserControl
+    x:Class="Wihomo.Views.ProxyGroupsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:Wihomo.ViewModels"
+    mc:Ignorable="d">
+
+    <Grid Padding="12" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button MinWidth="100" Content="刷新代理组" Command="{x:Bind ViewModel.RefreshProxyGroupsCommand}" />
+            <Button MinWidth="110" Content="测试所有节点" Command="{x:Bind ViewModel.TestAllDelaysCommand}" />
+            <TextBlock
+                Margin="8,0,0,0"
+                VerticalAlignment="Center"
+                Text="{x:Bind ViewModel.ProxyGroups.SelectedGroupStatusText, Mode=OneWay}" />
+            <TextBlock
+                VerticalAlignment="Center"
+                Text="{x:Bind ViewModel.ProxyGroups.AllDelayStatusText, Mode=OneWay}" />
+        </StackPanel>
+
+        <Grid Grid.Row="1" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="3*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Style="{StaticResource Card}">
+                <Grid RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="代理组" />
+                    <ListView
+                        Grid.Row="1"
+                        Padding="0"
+                        DisplayMemberPath="Display"
+                        ItemContainerStyle="{StaticResource TableRowContainer}"
+                        ItemsSource="{x:Bind ViewModel.ProxyGroups.Groups}"
+                        SelectedItem="{x:Bind ViewModel.ProxyGroups.SelectedGroup, Mode=TwoWay}"
+                        SelectionMode="Single" />
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource Card}">
+                <Grid RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="组成员" />
+                    <TextBlock Grid.Row="1" Text="{x:Bind ViewModel.ProxyGroups.CurrentSelectionText, Mode=OneWay}" />
+
+                    <Grid Grid.Row="2" RowSpacing="4">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Padding="8,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="100" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource TableHeaderText}" Text="节点" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource TableHeaderText}" Text="延迟" />
+                        </Grid>
+
+                        <ListView
+                            Grid.Row="1"
+                            Padding="0"
+                            ItemContainerStyle="{StaticResource TableRowContainer}"
+                            ItemsSource="{x:Bind ViewModel.ProxyGroups.SelectedGroup.Members, Mode=OneWay}"
+                            SelectedItem="{x:Bind ViewModel.ProxyGroups.SelectedMember, Mode=TwoWay}"
+                            SelectionMode="Single">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ProxyMemberViewModel">
+                                    <Grid Height="34">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="100" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Style="{StaticResource TableCellText}" Text="{x:Bind NodeName}" />
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            Style="{StaticResource TableCellText}"
+                                            Text="{x:Bind Delay, Mode=OneWay}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Grid>
+
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8">
+                        <Button MinWidth="120" Content="切换到选中节点" Command="{x:Bind ViewModel.ApplyProxyCommand}" />
+                        <Button MinWidth="120" Content="测试选中延迟" Command="{x:Bind ViewModel.TestDelayCommand}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8">
+                        <TextBlock Style="{StaticResource FormLabel}" Text="测试 URL" />
+                        <TextBox
+                            Width="270"
+                            Text="{x:Bind ViewModel.ProxyGroups.DelayTestUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FormLabel}" Text="超时(ms)" />
+                        <TextBox
+                            Width="80"
+                            Text="{x:Bind ViewModel.ProxyGroups.DelayTestTimeoutText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

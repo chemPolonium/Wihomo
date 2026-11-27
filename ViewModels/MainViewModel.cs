@@ -36,6 +36,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private ConnectionsFrame? _previousPoll;
     private DateTimeOffset _previousPollAt;
     private bool _pushHealthy;
+    private bool _systemProxyEngaged;
 
     [ObservableProperty] private string _message = "就绪";
     [ObservableProperty] private string _coreStatusText = "内核状态: 未启动";
@@ -118,9 +119,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         if (Settings.StartWithWindows)
         {
-            _windowsStartupService.SetEnabled(true);
+            await _windowsStartupService.SetEnabledAsync(true);
         }
-
         if (settings.StartCoreOnProgramStart)
         {
             await StartCoreAsync();
@@ -128,7 +128,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>托盘与窗口共享同一份状态文本，避免同一个概念散落在三处写入。</summary>
-    public string TrayText => $"Wihomo - {CoreStatusText}";
+    public string TrayText => $"{AppInstance.DisplayName} - {CoreStatusText}";
 
     partial void OnCoreStatusTextChanged(string value)
     {
@@ -171,12 +171,25 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         StopFallbackPolling();
         _telemetry.Stop();
 
-        if (_settings.Core.EnableSystemProxy)
+        // 只撤销本实例自己打开的系统代理：并行实例运行时旧版可能正接管着系统代理，
+        // 若仅凭设置里的 EnableSystemProxy 就关闭，会直接掐断用户正在使用的旧版。
+        if (_systemProxyEngaged)
         {
-            _systemProxyService.Disable();
-            if (!quiet)
+            try
             {
-                Logs.Append("系统代理已关闭。");
+                _systemProxyService.Disable();
+                if (!quiet)
+                {
+                    Logs.Append("系统代理已关闭。");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logs.Append($"关闭系统代理失败: {ex.Message}");
+            }
+            finally
+            {
+                _systemProxyEngaged = false;
             }
         }
 
@@ -251,6 +264,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (_settings.Core.EnableSystemProxy)
         {
             _systemProxyService.Enable("127.0.0.1", _settings.Core.MixedPort);
+            _systemProxyEngaged = true;
             Logs.Append($"系统代理已启用: 127.0.0.1:{_settings.Core.MixedPort}");
         }
 
@@ -364,9 +378,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         Telemetry.UpdateRuntimeIndicators(
             _settings.Core.EnableSystemProxy,
-            _settings.Core.MixedPort,
-            _settings.Core.EnableTun,
-            Settings.SelectedTunStack.Value);
+            _settings.Core.MixedPort);
     }
 
     private void EnsureCoreRunning()
@@ -389,48 +401,59 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         var candidate = CloneSettings();
         Settings.ApplyTo(candidate);
-        candidate.Subscriptions = Subscriptions.Items.Select(x => x.Item).ToList();
+        candidate.Subscriptions = Subscriptions.Items.Select(x => CloneSubscription(x.Item)).ToList();
+
+        var startupEnabled = await _windowsStartupService.SetEnabledAsync(candidate.StartWithWindows);
+        var startupBlocked = candidate.StartWithWindows && !startupEnabled;
+        if (startupBlocked)
+        {
+            candidate.StartWithWindows = false;
+        }
+
         await _settingsService.SaveAsync(candidate);
 
         _settings = candidate;
-        _windowsStartupService.SetEnabled(candidate.StartWithWindows);
+        Subscriptions.Load(_settings);
+        if (startupBlocked)
+        {
+            Settings.StartWithWindows = false;
+            Settings.IsDirty = false;
+        }
+
         RefreshRuntimeIndicators();
 
         if (!generateConfig)
         {
-            Message = "设置已保存。";
+            Message = startupBlocked
+                ? $"设置已保存，但{StartupBlockedReason}。"
+                : "设置已保存。";
             return;
         }
 
         WriteMihomoConfigFile(candidate);
-        Message = "设置已保存，并已生成 mihomo 配置文件。";
+        Message = startupBlocked
+            ? $"设置已保存，并已生成配置；{StartupBlockedReason}。"
+            : "设置已保存，并已生成 mihomo 配置文件。";
     }
 
-    /// <summary>复制当前已保存设置，作为界面编辑的落点；订阅列表沿用同一批对象。</summary>
+    private static string StartupBlockedReason => AppInstance.IsIsolated
+        ? "并行调试实例不注册开机自启"
+        : "开机自启被系统禁用";
+
+    /// <summary>
+    /// 复制当前已保存设置，作为界面编辑的落点。所有嵌套对象都必须深拷贝，
+    /// 否则 ApplyTo 会在保存成功前改写 _settings（保存失败时内存状态已脏）。
+    /// </summary>
     private AppSettings CloneSettings()
     {
         return new AppSettings
         {
-            Core = new CoreRuntimeSettings
-            {
-                CoreExecutablePath = _settings.Core.CoreExecutablePath,
-                WorkingDirectory = _settings.Core.WorkingDirectory,
-                ExternalControllerHost = _settings.Core.ExternalControllerHost,
-                ExternalControllerPort = _settings.Core.ExternalControllerPort,
-                Secret = _settings.Core.Secret,
-                MixedPort = _settings.Core.MixedPort,
-                SocksPort = _settings.Core.SocksPort,
-                HttpPort = _settings.Core.HttpPort,
-                EnableSystemProxy = _settings.Core.EnableSystemProxy,
-                EnableTun = _settings.Core.EnableTun,
-                TunStack = _settings.Core.TunStack,
-                BypassLocalNetworks = _settings.Core.BypassLocalNetworks,
-            },
-            Subscriptions = _settings.Subscriptions,
+            Core = CloneCore(_settings.Core),
+            Subscriptions = _settings.Subscriptions.Select(CloneSubscription).ToList(),
             ActiveSubscriptionName = _settings.ActiveSubscriptionName,
-            SubscriptionRules = _settings.SubscriptionRules,
-            GeoxUrls = _settings.GeoxUrls,
-            Dns = _settings.Dns,
+            SubscriptionRules = [.. _settings.SubscriptionRules],
+            GeoxUrls = CloneGeoxUrls(_settings.GeoxUrls),
+            Dns = CloneDns(_settings.Dns),
             RuleOverrides = _settings.RuleOverrides,
             StatsRefreshSeconds = _settings.StatsRefreshSeconds,
             StartCoreOnProgramStart = _settings.StartCoreOnProgramStart,
@@ -440,6 +463,56 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             GeoUpdateIntervalHours = _settings.GeoUpdateIntervalHours,
         };
     }
+
+    private static CoreRuntimeSettings CloneCore(CoreRuntimeSettings core) => new()
+    {
+        CoreExecutablePath = core.CoreExecutablePath,
+        WorkingDirectory = core.WorkingDirectory,
+        ExternalControllerHost = core.ExternalControllerHost,
+        ExternalControllerPort = core.ExternalControllerPort,
+        Secret = core.Secret,
+        MixedPort = core.MixedPort,
+        SocksPort = core.SocksPort,
+        HttpPort = core.HttpPort,
+        EnableSystemProxy = core.EnableSystemProxy,
+        BypassLocalNetworks = core.BypassLocalNetworks,
+    };
+
+    private static SubscriptionItem CloneSubscription(SubscriptionItem item) => new()
+    {
+        Name = item.Name,
+        Url = item.Url,
+        IntervalSeconds = item.IntervalSeconds,
+        Enabled = item.Enabled,
+        UploadBytes = item.UploadBytes,
+        DownloadBytes = item.DownloadBytes,
+        TotalBytes = item.TotalBytes,
+        ExpireAt = item.ExpireAt,
+    };
+
+    private static GeoxUrlSettings CloneGeoxUrls(GeoxUrlSettings geox) => new()
+    {
+        GeoIp = geox.GeoIp,
+        GeoSite = geox.GeoSite,
+        Mmdb = geox.Mmdb,
+        Asn = geox.Asn,
+    };
+
+    private static DnsSettings CloneDns(DnsSettings dns) => new()
+    {
+        Enable = dns.Enable,
+        Listen = dns.Listen,
+        Ipv6 = dns.Ipv6,
+        EnhancedMode = dns.EnhancedMode,
+        FakeIpRange = dns.FakeIpRange,
+        FakeIpFilter = [.. dns.FakeIpFilter],
+        DefaultNameserver = [.. dns.DefaultNameserver],
+        Nameserver = [.. dns.Nameserver],
+        Fallback = [.. dns.Fallback],
+        FallbackFilterGeoIp = dns.FallbackFilterGeoIp,
+        FallbackFilterGeoIpCode = dns.FallbackFilterGeoIpCode,
+        FallbackFilterIpCidr = [.. dns.FallbackFilterIpCidr],
+    };
 
     private string WriteMihomoConfigFile(AppSettings settings, HashSet<string>? localProviders = null)
     {
@@ -998,28 +1071,27 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         if (string.IsNullOrWhiteSpace(settings.Core.WorkingDirectory))
         {
-            settings.Core.WorkingDirectory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Wihomo", "runtime");
+            settings.Core.WorkingDirectory = AppInstance.RuntimeDirectory;
         }
 
         if (settings.Core.MixedPort <= 0)
         {
-            settings.Core.MixedPort = 8090;
+            settings.Core.MixedPort = AppInstance.DefaultMixedPort;
         }
 
         if (settings.Core.SocksPort <= 0)
         {
-            settings.Core.SocksPort = 8091;
+            settings.Core.SocksPort = AppInstance.DefaultSocksPort;
         }
 
         if (settings.Core.HttpPort <= 0)
         {
-            settings.Core.HttpPort = 8092;
+            settings.Core.HttpPort = AppInstance.DefaultHttpPort;
         }
 
-        if (string.IsNullOrWhiteSpace(settings.Core.TunStack))
+        if (settings.Core.ExternalControllerPort <= 0)
         {
-            settings.Core.TunStack = "mixed";
+            settings.Core.ExternalControllerPort = AppInstance.DefaultExternalControllerPort;
         }
 
         if (settings.StatsRefreshSeconds <= 0)
@@ -1049,9 +1121,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             var sourcePath = Path.Combine(sourceDir, fileName);
             var destinationPath = Path.Combine(workingDirectory, fileName);
-            if (File.Exists(sourcePath) && !File.Exists(destinationPath))
+            if (File.Exists(sourcePath) && ShouldCopyBundledGeoFile(sourcePath, destinationPath))
             {
-                File.Copy(sourcePath, destinationPath, overwrite: false);
+                File.Copy(sourcePath, destinationPath, overwrite: true);
+                Logs.Append($"已更新内置 GEO 数据: {fileName}");
             }
         }
 
@@ -1063,6 +1136,23 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 Logs.Append($"GEO 数据 {fileName}: 更新于 {File.GetLastWriteTime(filePath):yyyy-MM-dd HH:mm:ss}");
             }
         }
+    }
+
+    /// <summary>
+    /// 内置 GEO 数据不能只在目标缺失时复制：升级应用后包内文件可能已更新。
+    /// 以“包内副本更新或大小不同”为准覆盖，同时保留用户手动下载的更新版本。
+    /// </summary>
+    private static bool ShouldCopyBundledGeoFile(string sourcePath, string destinationPath)
+    {
+        if (!File.Exists(destinationPath))
+        {
+            return true;
+        }
+
+        var source = new FileInfo(sourcePath);
+        var destination = new FileInfo(destinationPath);
+        return source.Length != destination.Length
+            || source.LastWriteTimeUtc > destination.LastWriteTimeUtc;
     }
 
     // ---------------------------------------------------------------- 异常出口
@@ -1108,7 +1198,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         StopFallbackPolling();
         _telemetry.Stop();
 
-        if (_settings.Core.EnableSystemProxy)
+        if (_systemProxyEngaged)
         {
             try
             {
@@ -1117,6 +1207,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             catch (Exception ex)
             {
                 Logs.Append($"关闭系统代理失败: {ex.Message}");
+            }
+            finally
+            {
+                _systemProxyEngaged = false;
             }
         }
 

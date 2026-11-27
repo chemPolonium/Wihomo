@@ -228,7 +228,7 @@ public sealed class SubscriptionFormatConverter
         }
 
         var scheme = line[..schemeEnd].Trim().ToLowerInvariant();
-        return scheme is "anytls" or "ss" or "trojan" or "vmess" or "vless"
+        return scheme is "anytls" or "ss" or "trojan" or "vless"
             or "tuic" or "hysteria" or "hysteria2" or "hy2" or "http"
             or "https" or "socks5" or "socks5s";
     }
@@ -281,7 +281,10 @@ public sealed class SubscriptionFormatConverter
             "anytls" => ParseAnyTlsUri(uri, schemeEnd, index),
             "ss" => ParseShadowsocksUri(uri, schemeEnd, index),
             "trojan" => ParseTrojanUri(uri, schemeEnd, index),
-            _ => ParseGenericTlsUri(uri, schemeEnd, index, scheme)
+            "vless" or "tuic" or "hysteria" or "hysteria2" or "hy2"
+                or "http" or "https" or "socks5" or "socks5s"
+                => ParseGenericTlsUri(uri, schemeEnd, index, scheme),
+            _ => null
         };
     }
 

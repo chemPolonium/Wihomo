@@ -1,126 +1,204 @@
-using System.ComponentModel;
-using System.IO;
-using System.Windows;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Wihomo.Services;
 using Wihomo.ViewModels;
+using Wihomo.Views;
+using Windows.Graphics;
 using Drawing = System.Drawing;
 using Forms = System.Windows.Forms;
 
 namespace Wihomo;
 
 /// <summary>
-/// 窗口外壳：托盘宿主、关闭即隐藏、ESC 隐藏，以及日志控件的增量追加。
+/// 窗口外壳：导航、托盘宿主、关闭即隐藏、ESC 隐藏，以及全局状态栏。
 /// 所有业务状态与操作都在 MainViewModel 里，这里不承载逻辑。
 /// </summary>
-public partial class MainWindow : Window
+public sealed partial class MainWindow : Window
 {
-    /// <summary>日志控件行数超过该阈值时按视图模型的环形缓冲重建，避免控件无限增长。</summary>
-    private const int LogTrimLineCount = 600;
+    private const int DefaultWidth = 1120;
+    private const int DefaultHeight = 760;
+    private const int MinimumWidth = 880;
+    private const int MinimumHeight = 620;
 
-    private readonly MainViewModel _viewModel;
+    private readonly Dictionary<string, UserControl> _views = new(StringComparer.Ordinal);
     private readonly Drawing.Icon _applicationIcon;
     private readonly Forms.NotifyIcon _notifyIcon;
     private bool _isExiting;
+    private bool _uiDisposed;
+    private bool _initialSizeApplied;
+
+    public MainViewModel ViewModel { get; }
 
     public MainWindow()
     {
+        ViewModel = new MainViewModel(new WinUiDispatcher(DispatcherQueue));
         InitializeComponent();
 
-        _viewModel = new MainViewModel(new WpfUiDispatcher(Dispatcher));
-        DataContext = _viewModel;
+        // 并行调试实例在标题、导航栏和托盘上都带后缀，避免和旧版混淆。
+        Title = AppInstance.DisplayName;
+        Navigation.PaneTitle = AppInstance.DisplayName;
+
+        ConfigureWindow();
 
         _applicationIcon = LoadApplicationIcon();
-        Icon = LoadWindowIconSource();
         _notifyIcon = CreateNotifyIcon(_applicationIcon);
 
-        Loaded += MainWindow_Loaded;
-        Closing += MainWindow_Closing;
-        _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+        AppWindow.Closing += AppWindow_Closing;
+        Root.Loaded += Root_Loaded;
+        ViewModel.PropertyChanged += ViewModel_PropertyChanged;
 
-        _viewModel.Logs.LineAppended += AppendLogLine;
-        _viewModel.Logs.Cleared += ResetLogText;
+        Navigation.SelectedItem = Navigation.MenuItems[0];
     }
 
-    private async void MainWindow_Loaded(object? sender, RoutedEventArgs e)
+    private async void Root_Loaded(object sender, RoutedEventArgs e)
     {
-        await _viewModel.InitializeAsync();
-        ResetLogText();
-        _viewModel.Logs.ReplayTo(AppendLogLine);
+        ApplyInitialSize();
+        await ViewModel.InitializeAsync();
     }
 
-    private void MainWindow_Closing(object? sender, CancelEventArgs e)
+    /// <summary>
+    /// 窗口显示前 GetDpiForWindow 拿不到 DPI，因此初始尺寸推迟到 XamlRoot 可用后
+    /// 按 RasterizationScale 计算，并夹到当前显示器工作区内，避免 200% 缩放下窗口超出屏幕。
+    /// </summary>
+    private void ApplyInitialSize()
     {
-        if (!_isExiting)
+        if (_initialSizeApplied)
         {
-            e.Cancel = true;
-            HideToNotificationArea();
             return;
         }
 
-        _notifyIcon.Dispose();
-        _applicationIcon.Dispose();
-        _viewModel.PrepareForExit();
-        _viewModel.Dispose();
+        _initialSizeApplied = true;
+
+        var scale = Root.XamlRoot?.RasterizationScale ?? 1.0;
+        var work = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+        var margin = (int)(24 * scale);
+        var maxWidth = Math.Max(320, work.Width - margin * 2);
+        var maxHeight = Math.Max(240, work.Height - margin * 2);
+
+        var width = Math.Min((int)(DefaultWidth * scale), maxWidth);
+        var height = Math.Min((int)(DefaultHeight * scale), maxHeight);
+        width = Math.Max(width, Math.Min((int)(MinimumWidth * scale), maxWidth));
+        height = Math.Max(height, Math.Min((int)(MinimumHeight * scale), maxHeight));
+
+        AppWindow.Resize(new SizeInt32(width, height));
+        if (AppWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.PreferredMinimumWidth = Math.Min((int)(MinimumWidth * scale), maxWidth);
+            presenter.PreferredMinimumHeight = Math.Min((int)(MinimumHeight * scale), maxHeight);
+        }
+
+        var x = work.X + Math.Max(0, (work.Width - width) / 2);
+        var y = work.Y + Math.Max(0, (work.Height - height) / 2);
+        AppWindow.Move(new PointInt32(x, y));
     }
 
-    protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e)
+    private void ConfigureWindow()
     {
-        base.OnKeyDown(e);
-        if (e.Key == System.Windows.Input.Key.Escape)
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Branding", "AppIcon.ico");
+        if (File.Exists(iconPath))
         {
-            HideToNotificationArea();
-            e.Handled = true;
+            AppWindow.SetIcon(iconPath);
         }
+    }
+
+    private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+    {
+        if (args.SelectedItemContainer?.Tag is not string tag)
+        {
+            return;
+        }
+
+        PageHost.Content = GetView(tag);
+    }
+
+    private UserControl GetView(string tag)
+    {
+        if (_views.TryGetValue(tag, out var view))
+        {
+            return view;
+        }
+
+        view = tag switch
+        {
+            "overview" => new OverviewView(ViewModel),
+            "subscriptions" => new SubscriptionsView(ViewModel),
+            "proxy-groups" => new ProxyGroupsView(ViewModel),
+            "rules" => new RulesView(ViewModel),
+            "connections" => new ConnectionsView(ViewModel),
+            "logs" => new LogsView(ViewModel),
+            "geo-resources" => new GeoResourcesView(ViewModel),
+            "yaml-overrides" => new YamlOverridesView(ViewModel),
+            "core-settings" => new CoreSettingsView(ViewModel),
+            "dns-settings" => new DnsSettingsView(ViewModel),
+            _ => throw new ArgumentOutOfRangeException(nameof(tag), tag, "Unknown navigation tag."),
+        };
+
+        _views[tag] = view;
+        return view;
+    }
+
+    private void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (_isExiting)
+        {
+            return;
+        }
+
+        args.Cancel = true;
+        HideToNotificationArea();
+    }
+
+    private void Escape_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        HideToNotificationArea();
+        args.Handled = true;
     }
 
     internal void RestoreAndActivate()
     {
-        ShowInTaskbar = true;
-        Show();
-        if (WindowState == WindowState.Minimized)
+        AppWindow.Show();
+        if (AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized } presenter)
         {
-            WindowState = WindowState.Normal;
+            presenter.Restore();
         }
 
         Activate();
     }
 
-    private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MainViewModel.CoreStatusText))
         {
-            _notifyIcon.Text = _viewModel.TrayText;
+            _notifyIcon.Text = ViewModel.TrayText;
         }
     }
 
-    private static string ApplicationIconPath => Path.Combine(AppContext.BaseDirectory, "Wihomo.ico");
-
-    private static Drawing.Icon LoadApplicationIcon() => new(ApplicationIconPath);
-
-    private static ImageSource? LoadWindowIconSource()
+    private static Drawing.Icon LoadApplicationIcon()
     {
-        if (!File.Exists(ApplicationIconPath))
+        var path = Path.Combine(AppContext.BaseDirectory, "Branding", "AppIcon.ico");
+        if (!File.Exists(path))
         {
-            return null;
+            path = Path.Combine(AppContext.BaseDirectory, "Wihomo.ico");
         }
 
-        return BitmapFrame.Create(new Uri(ApplicationIconPath, UriKind.Absolute));
+        return new Drawing.Icon(path);
     }
 
     private Forms.NotifyIcon CreateNotifyIcon(Drawing.Icon applicationIcon)
     {
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("显示主窗口", null, (_, _) => ShowMainWindow());
-        menu.Items.Add("启动/重启内核", null, (_, _) => InvokeOnUi(() => _viewModel.StartCoreCommand.Execute(null)));
-        menu.Items.Add("停止内核", null, (_, _) => InvokeOnUi(() => _viewModel.StopCoreCommand.Execute(null)));
+        menu.Items.Add("启动/重启内核", null, (_, _) => InvokeOnUi(() => ViewModel.StartCoreCommand.Execute(null)));
+        menu.Items.Add("停止内核", null, (_, _) => InvokeOnUi(() => ViewModel.StopCoreCommand.Execute(null)));
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("退出", null, (_, _) => InvokeOnUi(ExitApplication));
 
         var notifyIcon = new Forms.NotifyIcon
         {
             Icon = applicationIcon,
-            Text = _viewModel.TrayText,
+            Text = ViewModel.TrayText,
             ContextMenuStrip = menu,
             Visible = true
         };
@@ -130,45 +208,43 @@ public partial class MainWindow : Window
 
     private void HideToNotificationArea()
     {
-        ShowInTaskbar = false;
-        Hide();
+        AppWindow.Hide();
     }
 
     private void ShowMainWindow()
     {
-        Dispatcher.InvokeAsync(RestoreAndActivate);
+        DispatcherQueue.TryEnqueue(RestoreAndActivate);
     }
 
     private void InvokeOnUi(Action action)
     {
-        Dispatcher.InvokeAsync(action);
+        DispatcherQueue.TryEnqueue(() => action());
     }
 
     private void ExitApplication()
     {
+        if (_isExiting)
+        {
+            return;
+        }
+
         _isExiting = true;
+        DisposeUi();
         Close();
     }
 
-    private void AppendLogLine(string line)
+    private void DisposeUi()
     {
-        LogsTextBox.AppendText(line + Environment.NewLine);
-        if (LogsTextBox.LineCount > LogTrimLineCount)
+        if (_uiDisposed)
         {
-            RebuildLogText();
+            return;
         }
 
-        LogsTextBox.ScrollToEnd();
-    }
-
-    private void ResetLogText()
-    {
-        LogsTextBox.Clear();
-    }
-
-    private void RebuildLogText()
-    {
-        LogsTextBox.Text = string.Join(Environment.NewLine, _viewModel.Logs.Lines);
-        LogsTextBox.CaretIndex = LogsTextBox.Text.Length;
+        _uiDisposed = true;
+        _notifyIcon.Visible = false;
+        _notifyIcon.Dispose();
+        _applicationIcon.Dispose();
+        ViewModel.PrepareForExit();
+        ViewModel.Dispose();
     }
 }

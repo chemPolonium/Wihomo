@@ -42,7 +42,7 @@ public sealed class MihomoTelemetryIntegrationTests : IAsyncLifetime
 
     public Task InitializeAsync()
     {
-        _workingDirectory = Path.Combine(Path.GetTempPath(), "wihomo-it-" + Guid.NewGuid().ToString("N")[..12]);
+        _workingDirectory = Path.Combine(TestPaths.TempRoot, "wihomo-it-" + Guid.NewGuid().ToString("N")[..12]);
         Directory.CreateDirectory(_workingDirectory);
         _controllerPort = GetFreeLoopbackPort();
         _mixedPort = GetFreeLoopbackPort();
@@ -241,7 +241,6 @@ public sealed class MihomoTelemetryIntegrationTests : IAsyncLifetime
         + "ipv6: false\n"
         + "external-controller: 127.0.0.1:" + _controllerPort + "\n"
         + "secret: " + Secret + "\n"
-        + "tun:\n  enable: false\n"
         + "rules:\n  - MATCH,DIRECT\n";
 
     private async Task<string> WaitUntilReadyAsync(MihomoApiClient api)

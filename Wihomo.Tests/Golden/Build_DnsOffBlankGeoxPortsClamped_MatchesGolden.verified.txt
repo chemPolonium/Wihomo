@@ -11,13 +11,6 @@ profile:
   store-selected: true
   store-fake-ip: true
 
-tun:
-  enable: false
-  stack: mixed
-  auto-route: true
-  auto-detect-interface: true
-  strict-route: true
-
 geodata-mode: false
 geo-auto-update: true
 geo-update-interval: 24

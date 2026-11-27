@@ -1,0 +1,26 @@
+<UserControl
+    x:Class="Wihomo.Views.OverviewView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Padding="12" Spacing="12">
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock FontSize="16" FontWeight="SemiBold" Text="{x:Bind ViewModel.CoreStatusText, Mode=OneWay}" />
+                    <TextBlock Style="{StaticResource StatLine}" Text="{x:Bind ViewModel.Telemetry.VersionText, Mode=OneWay}" />
+                    <TextBlock Style="{StaticResource StatLine}" Text="{x:Bind ViewModel.Telemetry.ConnectionsText, Mode=OneWay}" />
+                    <TextBlock Style="{StaticResource StatLine}" Text="{x:Bind ViewModel.Telemetry.DownloadTotalText, Mode=OneWay}" />
+                    <TextBlock Style="{StaticResource StatLine}" Text="{x:Bind ViewModel.Telemetry.UploadTotalText, Mode=OneWay}" />
+                    <TextBlock Style="{StaticResource StatLine}" Text="{x:Bind ViewModel.Telemetry.DownloadRateText, Mode=OneWay}" />
+                    <TextBlock Style="{StaticResource StatLine}" Text="{x:Bind ViewModel.Telemetry.UploadRateText, Mode=OneWay}" />
+                    <TextBlock Style="{StaticResource StatLine}" Text="{x:Bind ViewModel.Telemetry.SystemProxyStatusText, Mode=OneWay}" />
+                    <TextBlock Style="{StaticResource StatLine}" Text="{x:Bind AppVersionText}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

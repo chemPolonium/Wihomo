@@ -1,0 +1,43 @@
+<UserControl
+    x:Class="Wihomo.Views.LogsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid Padding="12" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button MinWidth="90" Content="清空日志" Command="{x:Bind ViewModel.ClearLogsCommand}" />
+            <Button MinWidth="90" Content="复制日志" Click="CopyLogs_Click" />
+            <TextBlock VerticalAlignment="Center" Style="{StaticResource TableHeaderText}" Text="最多保留 500 行" />
+        </StackPanel>
+
+        <Border Grid.Row="1" Padding="4" Style="{StaticResource Card}">
+            <ListView
+                x:Name="LogsList"
+                HorizontalContentAlignment="Left"
+                ItemContainerStyle="{StaticResource TableRowContainer}"
+                ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                ScrollViewer.HorizontalScrollMode="Enabled"
+                ScrollViewer.VerticalScrollBarVisibility="Auto"
+                SelectionMode="Extended">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                        <TextBlock
+                            FontFamily="Consolas"
+                            FontSize="12"
+                            IsTextSelectionEnabled="True"
+                            Text="{x:Bind}"
+                            TextWrapping="NoWrap" />
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Border>
+    </Grid>
+</UserControl>

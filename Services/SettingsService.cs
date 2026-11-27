@@ -13,19 +13,12 @@ public sealed class SettingsService
 
     private readonly string _settingsPath;
 
-    /// <param name="settingsPath">缺省落到 %AppData%\Wihomo\settings.json；测试注入临时路径以免触碰真实设置。</param>
+    /// <param name="settingsPath">
+    /// 缺省落到 <see cref="AppInstance.SettingsDirectory"/> 下的 settings.json；测试注入临时路径以免触碰真实设置。
+    /// </param>
     public SettingsService(string? settingsPath = null)
     {
-        if (settingsPath is not null)
-        {
-            _settingsPath = settingsPath;
-            return;
-        }
-
-        var baseDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Wihomo");
-        _settingsPath = Path.Combine(baseDir, "settings.json");
+        _settingsPath = settingsPath ?? Path.Combine(AppInstance.SettingsDirectory, "settings.json");
     }
 
     public string SettingsPath => _settingsPath;
@@ -34,7 +27,7 @@ public sealed class SettingsService
     {
         if (!File.Exists(_settingsPath))
         {
-            return new AppSettings();
+            return AppInstance.CreateDefaultSettings();
         }
 
         await using var stream = File.OpenRead(_settingsPath);
@@ -48,7 +41,49 @@ public sealed class SettingsService
             ?? throw new InvalidOperationException("Invalid settings path.");
         Directory.CreateDirectory(directory);
 
-        await using var stream = File.Create(_settingsPath);
-        await JsonSerializer.SerializeAsync(stream, settings, JsonOptions);
+        // 先写同目录临时文件，再原子替换；失败时旧 settings.json 保持完整，
+        // 不会出现 File.Create 已经截断、序列化却中途失败的半截文件。
+        var tempPath = Path.Combine(
+            directory,
+            $".{Path.GetFileName(_settingsPath)}.{Guid.NewGuid():N}.tmp");
+
+        try
+        {
+            await using (var stream = new FileStream(
+                tempPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None))
+            {
+                await JsonSerializer.SerializeAsync(stream, settings, JsonOptions);
+                await stream.FlushAsync();
+                stream.Flush(flushToDisk: true);
+            }
+
+            if (File.Exists(_settingsPath))
+            {
+                File.Replace(tempPath, _settingsPath, destinationBackupFileName: null);
+            }
+            else
+            {
+                File.Move(tempPath, _settingsPath);
+            }
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                try
+                {
+                    File.Delete(tempPath);
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+            }
+        }
     }
 }

@@ -10,13 +10,6 @@ namespace Wihomo.ViewModels;
 /// </summary>
 public sealed partial class SettingsViewModel : ObservableObject
 {
-    public static readonly IReadOnlyList<LabeledOption> TunStackOptions =
-    [
-        new("mixed", "mixed"),
-        new("system", "system"),
-        new("gvisor", "gvisor"),
-    ];
-
     public static readonly IReadOnlyList<LabeledOption> DnsEnhancedModeOptions =
     [
         new("fake-ip", "fake-ip"),
@@ -30,6 +23,14 @@ public sealed partial class SettingsViewModel : ObservableObject
         new("DAT", "dat"),
     ];
 
+    // WinUI XAML 不支持 x:Static，ComboBox 统一绑定实例属性。
+    public IReadOnlyList<LabeledOption> DnsEnhancedModeOptionList => DnsEnhancedModeOptions;
+
+    public IReadOnlyList<LabeledOption> GeoDataModeOptionList => GeoDataModeOptions;
+
+    /// <summary>并行调试实例不接管系统启动项，设置页据此禁用开关。</summary>
+    public bool CanStartWithWindows => !AppInstance.IsIsolated;
+
     [ObservableProperty] private string _corePath = string.Empty;
     [ObservableProperty] private string _coreWorkDir = string.Empty;
     [ObservableProperty] private string _controllerHost = string.Empty;
@@ -40,11 +41,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _secret = string.Empty;
     [ObservableProperty] private string _statsRefreshText = string.Empty;
     [ObservableProperty] private bool _enableSystemProxy;
-    [ObservableProperty] private bool _enableTun;
     [ObservableProperty] private bool _bypassLocalNetworks;
     [ObservableProperty] private bool _startCoreOnProgramStart;
     [ObservableProperty] private bool _startWithWindows;
-    [ObservableProperty] private LabeledOption _selectedTunStack;
     [ObservableProperty] private bool _enableDns;
     [ObservableProperty] private string _dnsListen = string.Empty;
     [ObservableProperty] private LabeledOption _selectedDnsEnhancedMode;
@@ -63,7 +62,6 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public SettingsViewModel()
     {
-        _selectedTunStack = TunStackOptions[0];
         _selectedDnsEnhancedMode = DnsEnhancedModeOptions[0];
         _selectedGeoDataMode = GeoDataModeOptions[0];
 
@@ -92,11 +90,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         Secret = settings.Core.Secret;
         StatsRefreshText = settings.StatsRefreshSeconds.ToString();
         EnableSystemProxy = settings.Core.EnableSystemProxy;
-        EnableTun = settings.Core.EnableTun;
         BypassLocalNetworks = settings.Core.BypassLocalNetworks;
         StartCoreOnProgramStart = settings.StartCoreOnProgramStart;
         StartWithWindows = settings.StartWithWindows;
-        SelectedTunStack = FindOption(TunStackOptions, settings.Core.TunStack);
 
         EnableDns = settings.Dns.Enable;
         DnsListen = settings.Dns.Listen;
@@ -159,9 +155,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         settings.Core.HttpPort = httpPort;
         settings.Core.Secret = Secret;
         settings.Core.EnableSystemProxy = EnableSystemProxy;
-        settings.Core.EnableTun = EnableTun;
         settings.Core.BypassLocalNetworks = BypassLocalNetworks;
-        settings.Core.TunStack = SelectedTunStack.Value;
 
         settings.StatsRefreshSeconds = statsRefresh;
         settings.StartCoreOnProgramStart = StartCoreOnProgramStart;

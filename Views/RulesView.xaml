@@ -1,0 +1,59 @@
+<UserControl
+    x:Class="Wihomo.Views.RulesView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid Padding="12" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal" Spacing="12">
+            <Button MinWidth="100" Content="刷新规则" Command="{x:Bind ViewModel.RefreshRulesCommand}" />
+            <TextBlock VerticalAlignment="Center" Style="{StaticResource TableHeaderText}" Text="显示订阅规则与当前生效规则" />
+        </StackPanel>
+
+        <Grid Grid.Row="1" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="1*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Style="{StaticResource Card}">
+                <Grid RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="订阅规则" />
+                    <ListView
+                        Grid.Row="1"
+                        Padding="0"
+                        ItemContainerStyle="{StaticResource TableRowContainer}"
+                        ItemsSource="{x:Bind ViewModel.Rules.SubscriptionRules}"
+                        SelectionMode="Single" />
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource Card}">
+                <Grid RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="当前规则" />
+                    <ListView
+                        Grid.Row="1"
+                        Padding="0"
+                        ItemContainerStyle="{StaticResource TableRowContainer}"
+                        ItemsSource="{x:Bind ViewModel.Rules.ActiveRules}"
+                        SelectionMode="Single" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

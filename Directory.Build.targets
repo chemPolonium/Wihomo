@@ -1,0 +1,13 @@
+<Project>
+
+  <PropertyGroup>
+    <!--
+      .NET 10 SDK 的 NuGet 还原图在并行模式下与本仓库“WinUI 主工程 + 内嵌测试工程”的组合
+      会静默失败：MSBuild 返回 1，但没有任何错误文本（单工程 dotnet build 正常）。
+      NuGet.targets 会先用全局 BuildInParallel 覆盖同名属性，因此必须在它之后再关掉还原图并行；
+      这只影响 restore 的工程图遍历，编译阶段仍按 MSBuild 默认并行执行。
+    -->
+    <RestoreBuildInParallel>false</RestoreBuildInParallel>
+  </PropertyGroup>
+
+</Project>

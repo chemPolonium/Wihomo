@@ -60,12 +60,8 @@ public sealed class SubscriptionConfigComposer
         SetScalar(profile, "store-selected", "true");
         SetScalar(profile, "store-fake-ip", "true");
 
-        var tun = GetOrCreateMap(root, "tun");
-        SetScalar(tun, "enable", settings.Core.EnableTun ? "true" : "false");
-        SetScalar(tun, "stack", NormalizeTunStack(settings.Core.TunStack));
-        SetScalar(tun, "auto-route", "true");
-        SetScalar(tun, "auto-detect-interface", "true");
-        SetScalar(tun, "strict-route", "true");
+        // TUN 模式已从客户端移除；订阅里若自带 tun 段也一并去掉，避免被动启用。
+        RemoveKey(root, "tun");
 
         if (settings.Dns.Enable)
         {
@@ -497,6 +493,15 @@ public sealed class SubscriptionConfigComposer
         node.Children[new YamlScalarNode(key)] = new YamlScalarNode(value);
     }
 
+    private static void RemoveKey(YamlMappingNode node, string key)
+    {
+        var keyNode = FindKeyNode(node, key);
+        if (keyNode is not null)
+        {
+            node.Children.Remove(keyNode);
+        }
+    }
+
     private static YamlScalarNode? FindKeyNode(YamlMappingNode node, string key)
     {
         foreach (var child in node.Children)
@@ -509,16 +514,6 @@ public sealed class SubscriptionConfigComposer
         }
 
         return null;
-    }
-
-    private static string NormalizeTunStack(string value)
-    {
-        return value switch
-        {
-            "system" => "system",
-            "gvisor" => "gvisor",
-            _ => "mixed"
-        };
     }
 
     private sealed record OverrideKeyOperation(string Key, bool ForceReplace, SequenceMergeMode SequenceMode);

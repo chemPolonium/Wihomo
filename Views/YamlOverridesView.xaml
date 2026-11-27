@@ -1,0 +1,29 @@
+<UserControl
+    x:Class="Wihomo.Views.YamlOverridesView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid Padding="12" RowSpacing="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock TextWrapping="Wrap" Text="对订阅配置进行 YAML 深度合并。key! 强制整体覆盖对象；+key 前置数组；key+ 追加数组。" />
+
+        <Border Grid.Row="1" Style="{StaticResource Card}">
+            <TextBox
+                x:Name="OverridesTextBox"
+                AcceptsReturn="True"
+                FontFamily="Consolas"
+                KeyDown="OverridesTextBox_KeyDown"
+                ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                ScrollViewer.VerticalScrollBarVisibility="Auto"
+                Text="{x:Bind ViewModel.Settings.RuleOverrides, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                TextWrapping="NoWrap" />
+        </Border>
+    </Grid>
+</UserControl>
