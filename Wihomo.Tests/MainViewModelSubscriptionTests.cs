@@ -46,12 +46,23 @@ public class MainViewModelSubscriptionTests : IDisposable
         await _viewModel.InitializeAsync();
         _viewModel.Subscriptions.SelectedSubscription = _viewModel.Subscriptions.FindByName("主订阅");
 
+        var subscriptionDir = Path.Combine(_directory, "subscriptions");
+        Directory.CreateDirectory(subscriptionDir);
+        var activePath = Path.Combine(subscriptionDir, "active.yaml");
+        var subscriptionPath = Path.Combine(
+            subscriptionDir,
+            $"{MihomoConfigBuilder.NormalizeName("主订阅")}.yaml");
+        File.WriteAllText(activePath, "mixed-port: 1");
+        File.WriteAllText(subscriptionPath, "mixed-port: 1");
+
         await _viewModel.RemoveSubscriptionCommand.ExecuteAsync(null);
 
         var saved = ReadSettings();
         Assert.Null(saved.Subscriptions.FirstOrDefault(x => x.Name == "主订阅"));
         Assert.NotNull(saved.Subscriptions.FirstOrDefault(x => x.Name == "备用订阅"));
         Assert.Equal(string.Empty, saved.ActiveSubscriptionName);
+        Assert.False(File.Exists(activePath));
+        Assert.False(File.Exists(subscriptionPath));
         Assert.Equal("订阅已删除。", _viewModel.Message);
     }
 
@@ -118,6 +129,23 @@ public class MainViewModelSubscriptionTests : IDisposable
         Assert.DoesNotContain("9.9.9.9", original.Dns.Nameserver);
         Assert.NotEqual("已修改", original.Subscriptions[0].Name);
         Assert.Empty(original.SubscriptionRules);
+    }
+
+    [Fact]
+    public async Task 保存设置会生成内核配置()
+    {
+        await _viewModel.InitializeAsync();
+
+        var subscriptionDir = Path.Combine(_directory, "subscriptions");
+        Directory.CreateDirectory(subscriptionDir);
+        File.WriteAllText(Path.Combine(subscriptionDir, "active.yaml"), Fixtures.SubscriptionYaml);
+
+        await _viewModel.SaveSettingsCommand.ExecuteAsync(null);
+
+        var configPath = Path.Combine(_directory, "config.yaml");
+        Assert.True(File.Exists(configPath));
+        Assert.Contains("mixed-port", File.ReadAllText(configPath));
+        Assert.Contains("已生成 mihomo 配置文件", _viewModel.Message);
     }
 
     public void Dispose()

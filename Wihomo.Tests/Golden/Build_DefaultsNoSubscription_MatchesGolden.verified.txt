@@ -53,16 +53,6 @@ geox-url:
   mmdb: 'https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb'
   asn: 'https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/GeoLite2-ASN.mmdb'
 
-proxy-providers:
-  default:
-    type: file
-    path: ./proxy_providers/default.yaml
-    interval: 3600
-    health-check:
-      enable: true
-      url: http://cp.cloudflare.com/generate_204
-      interval: 300
-
 proxy-groups:
   - name: PROXY
     type: select

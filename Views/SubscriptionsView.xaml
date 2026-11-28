@@ -25,7 +25,9 @@
             SelectedItem="{x:Bind ViewModel.Subscriptions.SelectedSubscription, Mode=TwoWay}">
             <ListView.Header>
                 <StackPanel Spacing="4">
-                    <TextBlock Text="订阅列表" />
+                    <TextBlock
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="订阅列表" />
                     <Grid Padding="16,0,12,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="60" />
@@ -66,32 +68,59 @@
             </ListView.ItemTemplate>
         </ListView>
 
+        <TextBlock
+            Grid.Row="1"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Text="暂无订阅"
+            Visibility="{x:Bind ViewModel.Subscriptions.IsEmpty, Mode=OneWay, Converter={StaticResource BoolToVis}}" />
+
         <Expander
             Grid.Row="2"
             Header="编辑订阅"
             HorizontalAlignment="Stretch"
             HorizontalContentAlignment="Stretch"
             IsExpanded="True">
-            <StackPanel Spacing="12">
-                <TextBox
-                    Header="名称"
-                    Text="{x:Bind ViewModel.Subscriptions.EditName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            <StackPanel Spacing="16">
+                <Grid ColumnSpacing="12" RowSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="180" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                <TextBox
-                    Header="URL"
-                    Text="{x:Bind ViewModel.Subscriptions.EditUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBox
+                        Header="名称"
+                        Text="{x:Bind ViewModel.Subscriptions.EditName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                <TextBox
-                    Header="更新间隔（秒）"
-                    InputScope="Number"
-                    Text="{x:Bind ViewModel.Subscriptions.EditIntervalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBox
+                        Grid.Column="1"
+                        Header="更新间隔（秒）"
+                        InputScope="Number"
+                        Text="{x:Bind ViewModel.Subscriptions.EditIntervalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <TextBox
+                        Grid.Row="1"
+                        Grid.ColumnSpan="2"
+                        Header="URL"
+                        Text="{x:Bind ViewModel.Subscriptions.EditUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                </Grid>
 
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button
                         Content="新增/更新"
                         Command="{x:Bind ViewModel.AddOrUpdateSubscriptionCommand}" />
-                    <Button Content="删除订阅" Command="{x:Bind ViewModel.RemoveSubscriptionCommand}" />
-                    <Button Content="激活订阅" Command="{x:Bind ViewModel.ActivateSubscriptionCommand}" />
+                    <Button
+                        Content="删除订阅"
+                        Command="{x:Bind ViewModel.RemoveSubscriptionCommand}"
+                        IsEnabled="{x:Bind ViewModel.Subscriptions.HasSelection, Mode=OneWay}" />
+                    <Button
+                        Content="激活订阅"
+                        Command="{x:Bind ViewModel.ActivateSubscriptionCommand}"
+                        IsEnabled="{x:Bind ViewModel.Subscriptions.HasSelection, Mode=OneWay}" />
                 </StackPanel>
             </StackPanel>
         </Expander>

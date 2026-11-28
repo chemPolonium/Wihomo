@@ -18,12 +18,15 @@
             Style="{StaticResource TitleTextBlockStyle}"
             Text="规则" />
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12">
-            <Button Content="刷新规则" Command="{x:Bind ViewModel.RefreshRulesCommand}" />
-            <TextBlock
-                VerticalAlignment="Center"
-                Text="显示订阅规则与当前生效规则" />
-        </StackPanel>
+        <CommandBar
+            Grid.Row="1"
+            HorizontalAlignment="Left"
+            DefaultLabelPosition="Right">
+            <AppBarButton
+                Icon="Refresh"
+                Label="刷新"
+                Command="{x:Bind ViewModel.RefreshRulesCommand}" />
+        </CommandBar>
 
         <Grid Grid.Row="2" ColumnSpacing="16">
             <Grid.ColumnDefinitions>
@@ -31,9 +34,12 @@
                 <ColumnDefinition Width="1*" />
             </Grid.ColumnDefinitions>
 
-            <ListView
-                Header="订阅规则"
-                ItemsSource="{x:Bind ViewModel.Rules.SubscriptionRules}">
+            <ListView ItemsSource="{x:Bind ViewModel.Rules.SubscriptionRules}">
+                <ListView.Header>
+                    <TextBlock
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="订阅规则" />
+                </ListView.Header>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="x:String">
                         <TextBlock
@@ -46,8 +52,12 @@
 
             <ListView
                 Grid.Column="1"
-                Header="当前规则"
                 ItemsSource="{x:Bind ViewModel.Rules.ActiveRules}">
+                <ListView.Header>
+                    <TextBlock
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="当前规则" />
+                </ListView.Header>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="x:String">
                         <TextBlock

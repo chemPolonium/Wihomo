@@ -17,16 +17,27 @@
                 HorizontalAlignment="Stretch"
                 HorizontalContentAlignment="Stretch"
                 IsExpanded="True">
-                <StackPanel Spacing="8">
+                <Grid ColumnSpacing="48" RowSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
                     <TextBlock Text="{x:Bind ViewModel.Telemetry.VersionText, Mode=OneWay}" />
-                    <TextBlock Text="{x:Bind ViewModel.Telemetry.ConnectionsText, Mode=OneWay}" />
-                    <TextBlock Text="{x:Bind ViewModel.Telemetry.DownloadTotalText, Mode=OneWay}" />
-                    <TextBlock Text="{x:Bind ViewModel.Telemetry.UploadTotalText, Mode=OneWay}" />
-                    <TextBlock Text="{x:Bind ViewModel.Telemetry.DownloadRateText, Mode=OneWay}" />
-                    <TextBlock Text="{x:Bind ViewModel.Telemetry.UploadRateText, Mode=OneWay}" />
-                    <TextBlock Text="{x:Bind ViewModel.Telemetry.SystemProxyStatusText, Mode=OneWay}" />
-                    <TextBlock Text="{x:Bind AppVersionText}" />
-                </StackPanel>
+                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.Telemetry.ConnectionsText, Mode=OneWay}" />
+                    <TextBlock Grid.Row="1" Text="{x:Bind ViewModel.Telemetry.DownloadTotalText, Mode=OneWay}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{x:Bind ViewModel.Telemetry.UploadTotalText, Mode=OneWay}" />
+                    <TextBlock Grid.Row="2" Text="{x:Bind ViewModel.Telemetry.DownloadRateText, Mode=OneWay}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{x:Bind ViewModel.Telemetry.UploadRateText, Mode=OneWay}" />
+                    <TextBlock Grid.Row="3" Text="{x:Bind ViewModel.Telemetry.SystemProxyStatusText, Mode=OneWay}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{x:Bind AppVersionText}" />
+                </Grid>
             </Expander>
         </StackPanel>
     </ScrollViewer>

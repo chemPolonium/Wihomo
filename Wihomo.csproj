@@ -16,7 +16,7 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>1.4.1</Version>
+    <Version>1.4.2</Version>
     <PublishTrimmed>false</PublishTrimmed>
     <PublishReadyToRun>false</PublishReadyToRun>
     <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>

@@ -18,23 +18,27 @@
                 HorizontalContentAlignment="Stretch"
                 IsExpanded="True">
                 <StackPanel Spacing="16">
-                    <TextBlock
-                        Text="配置 mihomo 的 DNS 解析行为。启用后将使用 fake-ip 模式防止 DNS 污染，并通过 fallback 机制确保国内外域名正确解析。"
-                        TextWrapping="Wrap" />
-
                     <CheckBox
                         Content="启用 DNS"
                         IsChecked="{x:Bind ViewModel.Settings.EnableDns, Mode=TwoWay}" />
 
-                    <TextBox
-                        Header="DNS 监听地址"
-                        Text="{x:Bind ViewModel.Settings.DnsListen, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
 
-                    <ComboBox
-                        Header="增强模式"
-                        DisplayMemberPath="Display"
-                        ItemsSource="{x:Bind ViewModel.Settings.DnsEnhancedModeOptionList}"
-                        SelectedItem="{x:Bind ViewModel.Settings.SelectedDnsEnhancedMode, Mode=TwoWay}" />
+                        <TextBox
+                            Header="DNS 监听地址"
+                            Text="{x:Bind ViewModel.Settings.DnsListen, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <ComboBox
+                            Grid.Column="1"
+                            Header="增强模式"
+                            DisplayMemberPath="Display"
+                            ItemsSource="{x:Bind ViewModel.Settings.DnsEnhancedModeOptionList}"
+                            SelectedItem="{x:Bind ViewModel.Settings.SelectedDnsEnhancedMode, Mode=TwoWay}" />
+                    </Grid>
 
                     <TextBox
                         Header="默认 DNS（用于解析 DoH 域名，每行一个）"
@@ -63,14 +67,10 @@
                         Text="{x:Bind ViewModel.Settings.FallbackText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                         TextWrapping="Wrap" />
 
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Button
-                            Content="保存设置"
-                            Command="{x:Bind ViewModel.SaveSettingsCommand}" />
-                        <TextBlock
-                            VerticalAlignment="Center"
-                            Text="修改后需重启内核生效" />
-                    </StackPanel>
+                    <Button
+                        HorizontalAlignment="Left"
+                        Content="保存设置"
+                        Command="{x:Bind ViewModel.SaveSettingsCommand}" />
                 </StackPanel>
             </Expander>
         </StackPanel>

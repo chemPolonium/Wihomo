@@ -26,38 +26,54 @@
                         Header="工作目录"
                         Text="{x:Bind ViewModel.Settings.CoreWorkDir, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBox
-                        Header="External Controller Host"
-                        Text="{x:Bind ViewModel.Settings.ControllerHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <Grid ColumnSpacing="12" RowSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
 
-                    <TextBox
-                        Header="External Controller Port"
-                        InputScope="Number"
-                        Text="{x:Bind ViewModel.Settings.ControllerPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox
+                            Header="External Controller Host"
+                            Text="{x:Bind ViewModel.Settings.ControllerHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox
+                            Grid.Column="1"
+                            Header="External Controller Port"
+                            InputScope="Number"
+                            Text="{x:Bind ViewModel.Settings.ControllerPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBox
-                        Header="Mixed Port"
-                        InputScope="Number"
-                        Text="{x:Bind ViewModel.Settings.MixedPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox
+                            Grid.Row="1"
+                            Header="Mixed Port"
+                            InputScope="Number"
+                            Text="{x:Bind ViewModel.Settings.MixedPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox
+                            Grid.Row="1"
+                            Grid.Column="1"
+                            Header="SOCKS Port"
+                            InputScope="Number"
+                            Text="{x:Bind ViewModel.Settings.SocksPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <TextBox
-                        Header="SOCKS Port"
-                        InputScope="Number"
-                        Text="{x:Bind ViewModel.Settings.SocksPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                    <TextBox
-                        Header="HTTP Port"
-                        InputScope="Number"
-                        Text="{x:Bind ViewModel.Settings.HttpPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox
+                            Grid.Row="2"
+                            Header="HTTP Port"
+                            InputScope="Number"
+                            Text="{x:Bind ViewModel.Settings.HttpPortText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox
+                            Grid.Row="2"
+                            Grid.Column="1"
+                            Header="统计刷新间隔（秒）"
+                            InputScope="Number"
+                            Text="{x:Bind ViewModel.Settings.StatsRefreshText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </Grid>
 
                     <TextBox
                         Header="Secret"
                         Text="{x:Bind ViewModel.Settings.Secret, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                    <TextBox
-                        Header="统计刷新间隔（秒）"
-                        InputScope="Number"
-                        Text="{x:Bind ViewModel.Settings.StatsRefreshText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                     <StackPanel Spacing="8">
                         <CheckBox

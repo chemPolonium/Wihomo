@@ -37,6 +37,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private DateTimeOffset _previousPollAt;
     private bool _pushHealthy;
     private bool _systemProxyEngaged;
+    private bool _isSwitchingProxy;
 
     [ObservableProperty] private string _message = "就绪";
     [ObservableProperty] private string _coreStatusText = "内核状态: 未启动";
@@ -392,13 +393,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     // ---------------------------------------------------------------- 保存与配置
 
     [RelayCommand]
-    private Task SaveSettingsAsync() => RunSafelyAsync(() => SaveInternalAsync(generateConfig: false));
+    private Task SaveSettingsAsync() => RunSafelyAsync(SaveInternalAsync);
 
-    [RelayCommand]
-    private Task SaveAllAsync() => RunSafelyAsync(() => SaveInternalAsync(generateConfig: true));
-
-    private async Task SaveInternalAsync(bool generateConfig)
+    private async Task SaveInternalAsync()
     {
+        var previous = _settings;
         var candidate = CloneSettings();
         Settings.ApplyTo(candidate);
         candidate.Subscriptions = Subscriptions.Items.Select(x => CloneSubscription(x.Item)).ToList();
@@ -422,18 +421,100 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         RefreshRuntimeIndicators();
 
-        if (!generateConfig)
+        // 保存即生效：内核运行中优先热重载，只有端点等无法热切换的项变化时才重启。
+        string applied;
+        try
         {
-            Message = startupBlocked
-                ? $"设置已保存，但{StartupBlockedReason}。"
-                : "设置已保存。";
-            return;
+            var configPath = WriteMihomoConfigFile(candidate);
+            applied = _processManager.IsRunning
+                ? await ApplyToRunningCoreAsync(previous, candidate, configPath)
+                : "设置已保存，并已生成 mihomo 配置文件。";
+        }
+        catch (Exception ex)
+        {
+            Logs.Append($"生成或应用配置失败: {ex.Message}");
+            applied = _processManager.IsRunning
+                ? "设置已保存，但配置生成/应用失败，内核未重载。"
+                : "设置已保存，但内核重启失败，请查看日志。";
         }
 
-        WriteMihomoConfigFile(candidate);
-        Message = startupBlocked
-            ? $"设置已保存，并已生成配置；{StartupBlockedReason}。"
-            : "设置已保存，并已生成 mihomo 配置文件。";
+        Message = startupBlocked ? $"{applied.TrimEnd('。')}；{StartupBlockedReason}。" : applied;
+    }
+
+    /// <summary>热重载不会改变 API 端点；走到这里说明设置里改了内核路径、工作目录或控制端口/密钥。</summary>
+    private static bool CanReloadCore(AppSettings previous, AppSettings next)
+    {
+        return string.Equals(previous.Core.CoreExecutablePath, next.Core.CoreExecutablePath, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(previous.Core.WorkingDirectory, next.Core.WorkingDirectory, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(previous.Core.ExternalControllerHost, next.Core.ExternalControllerHost, StringComparison.OrdinalIgnoreCase)
+            && previous.Core.ExternalControllerPort == next.Core.ExternalControllerPort
+            && string.Equals(previous.Core.Secret, next.Core.Secret, StringComparison.Ordinal);
+    }
+
+    private async Task<string> ApplyToRunningCoreAsync(AppSettings previous, AppSettings next, string configPath)
+    {
+        if (CanReloadCore(previous, next))
+        {
+            var reloaded = false;
+            try
+            {
+                ConfigureApiClient();
+                await _apiClient.ReloadConfigsAsync(configPath);
+                ApplySystemProxyChange(previous.Core, next.Core);
+                Logs.Append("内核配置已热重载。");
+                reloaded = true;
+            }
+            catch (Exception ex)
+            {
+                Logs.Append($"配置热重载失败，将重启内核: {ex.Message}");
+            }
+
+            if (reloaded)
+            {
+                try
+                {
+                    await RefreshProxyGroupsCoreAsync();
+                }
+                catch (Exception ex)
+                {
+                    Logs.Append($"刷新代理组失败: {ex.Message}");
+                }
+
+                return "设置已保存，内核配置已热重载。";
+            }
+        }
+
+        StopCoreCore(quiet: false);
+        Logs.Append("内核已停止，正在应用新设置并重启。");
+        await StartInternalAsync(localProviders: null);
+        return "设置已保存，内核已重启。";
+    }
+
+    /// <summary>热重载只能改配置，系统代理是应用侧状态，需要按新端口单独同步。</summary>
+    private void ApplySystemProxyChange(CoreRuntimeSettings previous, CoreRuntimeSettings next)
+    {
+        var needsEnable = next.EnableSystemProxy
+            && (!previous.EnableSystemProxy || previous.MixedPort != next.MixedPort || !_systemProxyEngaged);
+
+        try
+        {
+            if (needsEnable)
+            {
+                _systemProxyService.Enable("127.0.0.1", next.MixedPort);
+                _systemProxyEngaged = true;
+                Logs.Append($"系统代理已启用: 127.0.0.1:{next.MixedPort}");
+            }
+            else if (!next.EnableSystemProxy && _systemProxyEngaged)
+            {
+                _systemProxyService.Disable();
+                _systemProxyEngaged = false;
+                Logs.Append("系统代理已关闭。");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logs.Append($"同步系统代理失败: {ex.Message}");
+        }
     }
 
     private static string StartupBlockedReason => AppInstance.IsIsolated
@@ -620,15 +701,33 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var selected = Subscriptions.SelectedSubscription
             ?? throw new InvalidOperationException("请先选择要删除的订阅。");
 
+        var wasActive = string.Equals(
+            _settings.ActiveSubscriptionName,
+            selected.Name,
+            StringComparison.OrdinalIgnoreCase);
+        var activePath = GetActiveSubscriptionPath(_settings);
+        var subscriptionPath = GetSubscriptionFilePath(selected.Name);
+
         _settings.Subscriptions.Remove(selected.Item);
-        if (string.Equals(_settings.ActiveSubscriptionName, selected.Name, StringComparison.OrdinalIgnoreCase))
+        if (wasActive)
         {
             _settings.ActiveSubscriptionName = string.Empty;
         }
 
+        // 先落盘再删文件：保存失败时不会出现设置仍引用、文件却已丢失的情况。
         await _settingsService.SaveAsync(_settings);
+
+        if (wasActive)
+        {
+            TryDelete(activePath);
+        }
+
+        TryDelete(subscriptionPath);
+
         Subscriptions.Load(_settings);
-        Message = "订阅已删除。";
+        Message = _processManager.IsRunning
+            ? "订阅已删除；当前内核仍使用旧配置，重启内核后生效。"
+            : "订阅已删除。";
     }
 
     [RelayCommand]
@@ -715,45 +814,51 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         Message = $"已刷新 {groups.Count} 个代理组。";
     }
 
-    [RelayCommand]
-    private Task ApplyProxyAsync() => RunSafelyAsync(ApplyProxyAsyncInternal);
+    /// <summary>成员列表单击即切换：点击行直接调用内核 API，不再需要单独的“切换节点”按钮。</summary>
+    public Task SelectProxyMemberAsync(ProxyMemberViewModel? member)
+    {
+        // 连续点击多个节点时只保留第一次切换，避免两次刷新交错把选中项改回去。
+        if (_isSwitchingProxy)
+        {
+            return Task.CompletedTask;
+        }
 
-    private async Task ApplyProxyAsyncInternal()
+        return RunSafelyAsync(async () =>
+        {
+            _isSwitchingProxy = true;
+            try
+            {
+                await SelectProxyMemberAsyncInternal(member);
+            }
+            finally
+            {
+                _isSwitchingProxy = false;
+            }
+        });
+    }
+
+    private async Task SelectProxyMemberAsyncInternal(ProxyMemberViewModel? member)
     {
         EnsureCoreRunning();
         var group = ProxyGroups.SelectedGroup ?? throw new InvalidOperationException("请先选择代理组。");
-        var proxyName = ProxyGroups.SelectedMember?.NodeName;
+        var proxyName = member?.NodeName;
 
         if (string.IsNullOrWhiteSpace(proxyName))
         {
-            throw new InvalidOperationException("请先选择节点。");
+            return;
+        }
+
+        // 点击当前节点时不重复调用，避免整表刷新造成闪烁。
+        if (string.Equals(proxyName, group.Current, StringComparison.Ordinal))
+        {
+            return;
         }
 
         ConfigureApiClient();
         await _apiClient.SelectProxyAsync(group.Name, proxyName);
         Logs.Append($"代理组 {group.Name} 已切换到 {proxyName}");
         await RefreshProxyGroupsCoreAsync();
-        Message = "代理组已切换。";
-    }
-
-    [RelayCommand]
-    private Task TestDelayAsync() => RunSafelyAsync(TestDelayAsyncInternal);
-
-    private async Task TestDelayAsyncInternal()
-    {
-        EnsureCoreRunning();
-        var proxyName = ProxyGroups.SelectedMember?.NodeName
-            ?? throw new InvalidOperationException("请先选择要测试的节点。");
-
-        var (url, timeout) = ReadDelayTestArguments();
-        ConfigureApiClient();
-        var delay = await _apiClient.TestProxyDelayAsync(proxyName, url, timeout);
-        _delayResults[proxyName] = delay.HasValue ? $"{delay.Value} ms" : "失败";
-        ProxyGroups.RefreshDelays(NameOfDelay);
-
-        var message = delay.HasValue ? $"{proxyName} 延迟: {delay.Value} ms" : $"{proxyName} 延迟测试失败";
-        Logs.Append(message);
-        Message = message;
+        Message = $"已切换到 {proxyName}。";
     }
 
     [RelayCommand]

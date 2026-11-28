@@ -18,10 +18,6 @@
                 HorizontalContentAlignment="Stretch"
                 IsExpanded="True">
                 <StackPanel Spacing="16">
-                    <TextBlock
-                        Text="由 mihomo 负责下载和自动更新 GEO 数据库；此页面仅配置下载地址与更新策略。"
-                        TextWrapping="Wrap" />
-
                     <TextBox
                         Header="GeoIP 数据库"
                         Text="{x:Bind ViewModel.Settings.GeoIpUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -38,26 +34,33 @@
                         Header="ASN 数据库"
                         Text="{x:Bind ViewModel.Settings.AsnUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                    <ComboBox
-                        Header="Geodata 数据模式"
-                        DisplayMemberPath="Display"
-                        ItemsSource="{x:Bind ViewModel.Settings.GeoDataModeOptionList}"
-                        SelectedItem="{x:Bind ViewModel.Settings.SelectedGeoDataMode, Mode=TwoWay}" />
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="220" />
+                        </Grid.ColumnDefinitions>
 
-                    <StackPanel Spacing="12">
-                        <CheckBox
-                            Content="自动更新 GEO 数据"
-                            IsChecked="{x:Bind ViewModel.Settings.GeoAutoUpdate, Mode=TwoWay}" />
+                        <ComboBox
+                            Header="Geodata 数据模式"
+                            DisplayMemberPath="Display"
+                            ItemsSource="{x:Bind ViewModel.Settings.GeoDataModeOptionList}"
+                            SelectedItem="{x:Bind ViewModel.Settings.SelectedGeoDataMode, Mode=TwoWay}" />
+
                         <TextBox
+                            Grid.Column="1"
                             Header="更新间隔（小时）"
                             InputScope="Number"
                             Text="{x:Bind ViewModel.Settings.GeoUpdateIntervalText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    </StackPanel>
+                    </Grid>
+
+                    <CheckBox
+                        Content="自动更新 GEO 数据"
+                        IsChecked="{x:Bind ViewModel.Settings.GeoAutoUpdate, Mode=TwoWay}" />
 
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button
-                            Content="保存外部资源设置并生成配置"
-                            Command="{x:Bind ViewModel.SaveAllCommand}" />
+                            Content="保存设置"
+                            Command="{x:Bind ViewModel.SaveSettingsCommand}" />
                         <Button
                             Content="手动更新 GEO 数据"
                             Command="{x:Bind ViewModel.ManualUpdateGeoDataCommand}" />

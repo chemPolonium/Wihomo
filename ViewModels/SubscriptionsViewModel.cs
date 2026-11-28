@@ -34,6 +34,10 @@ public sealed partial class SubscriptionsViewModel : ObservableObject
 
     public ObservableCollection<SubscriptionRowViewModel> Items { get; } = [];
 
+    public bool HasSelection => SelectedSubscription is not null;
+
+    public bool IsEmpty => Items.Count == 0;
+
     private bool _isRestoringSelection;
 
     public void Load(AppSettings settings)
@@ -43,7 +47,7 @@ public sealed partial class SubscriptionsViewModel : ObservableObject
 
         RestoreRows(settings.Subscriptions, selectedName);
 
-        if (!isEditing)
+        if (!isEditing || SelectedSubscription is null)
         {
             EditName = string.Empty;
             EditUrl = string.Empty;
@@ -74,6 +78,8 @@ public sealed partial class SubscriptionsViewModel : ObservableObject
         {
             _isRestoringSelection = false;
         }
+
+        OnPropertyChanged(nameof(IsEmpty));
     }
 
     public void AddNew(SubscriptionItem subscription)
@@ -99,6 +105,8 @@ public sealed partial class SubscriptionsViewModel : ObservableObject
 
     partial void OnSelectedSubscriptionChanged(SubscriptionRowViewModel? value)
     {
+        OnPropertyChanged(nameof(HasSelection));
+
         if (value is null || _isRestoringSelection)
         {
             return;

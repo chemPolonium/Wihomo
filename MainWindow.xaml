@@ -53,7 +53,8 @@
                         <AppBarButton
                             Icon="Stop"
                             Label="停止内核"
-                            Command="{x:Bind ViewModel.StopCoreCommand}" />
+                            Command="{x:Bind ViewModel.StopCoreCommand}"
+                            IsEnabled="{x:Bind ViewModel.IsCoreRunning, Mode=OneWay}" />
                     </CommandBar>
                 </StackPanel>
             </TitleBar.Content>
@@ -128,6 +129,7 @@
                         Text="启动/重启内核" />
                     <MenuFlyoutItem
                         Command="{x:Bind ViewModel.StopCoreCommand}"
+                        IsEnabled="{x:Bind ViewModel.IsCoreRunning, Mode=OneWay}"
                         Text="停止内核" />
                     <MenuFlyoutSeparator />
                     <MenuFlyoutItem

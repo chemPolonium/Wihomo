@@ -6,7 +6,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid Padding="24" RowSpacing="12">
+    <Grid Padding="24" RowSpacing="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -18,21 +18,31 @@
             Style="{StaticResource TitleTextBlockStyle}"
             Text="日志" />
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
-            <Button Content="清空日志" Command="{x:Bind ViewModel.ClearLogsCommand}" />
-            <Button Content="复制日志" Click="CopyLogs_Click" />
-            <TextBlock
-                VerticalAlignment="Center"
-                Text="最多保留 500 行" />
-        </StackPanel>
+        <CommandBar
+            Grid.Row="1"
+            HorizontalAlignment="Left"
+            DefaultLabelPosition="Right">
+            <AppBarButton
+                Icon="Delete"
+                Label="清空"
+                Command="{x:Bind ViewModel.ClearLogsCommand}" />
+            <AppBarButton
+                Icon="Copy"
+                Label="复制"
+                Click="CopyLogs_Click" />
+        </CommandBar>
 
         <ListView
             x:Name="LogsList"
             Grid.Row="2"
-            Header="内核输出"
             ScrollViewer.HorizontalScrollBarVisibility="Auto"
             ScrollViewer.HorizontalScrollMode="Enabled"
             ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ListView.Header>
+                <TextBlock
+                    Style="{StaticResource BodyStrongTextBlockStyle}"
+                    Text="内核输出" />
+            </ListView.Header>
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="x:String">
                     <TextBlock

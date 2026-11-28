@@ -359,6 +359,8 @@ public class SubscriptionsViewModelTests
 
         Assert.Empty(vm.Items);
         Assert.Null(vm.SelectedSubscription);
+        Assert.Equal(string.Empty, vm.EditName);
+        Assert.Equal(string.Empty, vm.EditUrl);
     }
 }
 

@@ -34,20 +34,13 @@
                 <AppBarButton
                     Icon="Refresh"
                     Label="刷新"
-                    Command="{x:Bind ViewModel.RefreshProxyGroupsCommand}" />
+                    Command="{x:Bind ViewModel.RefreshProxyGroupsCommand}"
+                    IsEnabled="{x:Bind ViewModel.IsCoreRunning, Mode=OneWay}" />
                 <AppBarButton
                     Icon="Play"
                     Label="测试全部"
-                    Command="{x:Bind ViewModel.TestAllDelaysCommand}" />
-                <AppBarSeparator />
-                <AppBarButton
-                    Icon="Accept"
-                    Label="切换节点"
-                    Command="{x:Bind ViewModel.ApplyProxyCommand}" />
-                <AppBarButton
-                    Icon="Clock"
-                    Label="测试延迟"
-                    Command="{x:Bind ViewModel.TestDelayCommand}" />
+                    Command="{x:Bind ViewModel.TestAllDelaysCommand}"
+                    IsEnabled="{x:Bind ViewModel.IsCoreRunning, Mode=OneWay}" />
                 <AppBarSeparator />
                 <AppBarButton
                     Icon="Setting"
@@ -80,9 +73,13 @@
             </Grid.ColumnDefinitions>
 
             <ListView
-                Header="组列表"
                 ItemsSource="{x:Bind ViewModel.ProxyGroups.Groups}"
                 SelectedItem="{x:Bind ViewModel.ProxyGroups.SelectedGroup, Mode=TwoWay}">
+                <ListView.Header>
+                    <TextBlock
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="组列表" />
+                </ListView.Header>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="vm:ProxyGroupViewModel">
                         <StackPanel Spacing="2">
@@ -110,11 +107,15 @@
 
                 <ListView
                     Grid.Row="1"
+                    IsItemClickEnabled="{x:Bind ViewModel.IsCoreRunning, Mode=OneWay}"
+                    ItemClick="MemberList_ItemClick"
                     ItemsSource="{x:Bind ViewModel.ProxyGroups.SelectedGroup.Members, Mode=OneWay}"
                     SelectedItem="{x:Bind ViewModel.ProxyGroups.SelectedMember, Mode=TwoWay}">
                     <ListView.Header>
                         <StackPanel Spacing="4">
-                            <TextBlock Text="组成员" />
+                            <TextBlock
+                                Style="{StaticResource BodyStrongTextBlockStyle}"
+                                Text="组成员" />
                             <Grid Padding="16,0,12,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -143,6 +144,13 @@
                 </ListView>
             </Grid>
         </Grid>
+
+        <TextBlock
+            Grid.Row="2"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Text="暂无代理组"
+            Visibility="{x:Bind ViewModel.ProxyGroups.IsEmpty, Mode=OneWay, Converter={StaticResource BoolToVis}}" />
 
         <ContentDialog
             x:Name="DelaySettingsDialog"

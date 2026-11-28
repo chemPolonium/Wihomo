@@ -144,20 +144,9 @@ public sealed class MihomoConfigBuilder
             sb.AppendLine();
         }
 
-        sb.AppendLine("proxy-providers:");
-        if (enabledProviders.Count == 0)
+        if (enabledProviders.Count > 0)
         {
-            sb.AppendLine("  default:");
-            sb.AppendLine("    type: file");
-            sb.AppendLine("    path: ./proxy_providers/default.yaml");
-            sb.AppendLine("    interval: 3600");
-            sb.AppendLine("    health-check:");
-            sb.AppendLine("      enable: true");
-            sb.AppendLine("      url: http://cp.cloudflare.com/generate_204");
-            sb.AppendLine("      interval: 300");
-        }
-        else
-        {
+            sb.AppendLine("proxy-providers:");
             foreach (var provider in enabledProviders)
             {
                 sb.AppendLine($"  {provider.ProviderKey}:");
@@ -178,9 +167,10 @@ public sealed class MihomoConfigBuilder
                 sb.AppendLine("      url: http://cp.cloudflare.com/generate_204");
                 sb.AppendLine("      interval: 300");
             }
+
+            sb.AppendLine();
         }
 
-        sb.AppendLine();
         sb.AppendLine("proxy-groups:");
         if (enabledProviders.Count > 0)
         {

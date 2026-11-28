@@ -62,6 +62,8 @@ public sealed partial class ProxyGroupsViewModel : ObservableObject
 
     public ObservableCollection<ProxyGroupViewModel> Groups { get; } = [];
 
+    public bool IsEmpty => Groups.Count == 0;
+
     public void Replace(IReadOnlyList<ProxyGroupInfo> groups, Func<string, string> delayOf, bool showCurrentInHeader)
     {
         var selectedName = SelectedGroup?.Name;
@@ -75,6 +77,7 @@ public sealed partial class ProxyGroupsViewModel : ObservableObject
 
         SelectedGroup = Groups.FirstOrDefault(x => string.Equals(x.Name, selectedName, StringComparison.Ordinal))
             ?? Groups.FirstOrDefault();
+        OnPropertyChanged(nameof(IsEmpty));
     }
 
     public void Clear()
@@ -86,6 +89,7 @@ public sealed partial class ProxyGroupsViewModel : ObservableObject
         SelectedGroupStatusText = "当前组: -";
         CurrentSelectionText = "当前选择: -";
         IsTestingAllDelays = false;
+        OnPropertyChanged(nameof(IsEmpty));
     }
 
     /// <summary>测速结果落地后刷新当前组的延迟列，并保持所选节点不变。</summary>
