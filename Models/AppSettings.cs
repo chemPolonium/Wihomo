@@ -8,6 +8,7 @@ public sealed class AppSettings
     public List<string> SubscriptionRules { get; set; } = [];
     public GeoxUrlSettings GeoxUrls { get; set; } = new();
     public DnsSettings Dns { get; set; } = new();
+    public ProxyTestSettings ProxyTest { get; set; } = new();
     public string RuleOverrides { get; set; } = string.Empty;
     public int StatsRefreshSeconds { get; set; } = 2;
     public bool StartCoreOnProgramStart { get; set; }

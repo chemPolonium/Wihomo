@@ -29,20 +29,31 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly MihomoTelemetry _telemetry;
     private readonly IUiDispatcher _dispatcher;
     private readonly Dictionary<string, string> _delayResults = new(StringComparer.Ordinal);
+    private readonly SemaphoreSlim _saveGate = new(1, 1);
 
     private AppSettings _settings = new();
 
     private CancellationTokenSource? _fallbackCancellation;
+    private CancellationTokenSource? _preferenceSaveCancellation;
     private ConnectionsFrame? _previousPoll;
     private DateTimeOffset _previousPollAt;
     private bool _pushHealthy;
     private bool _systemProxyEngaged;
     private bool _isSwitchingProxy;
+    private bool _initialized;
+    private bool _suppressPreferenceAutoSave;
 
     [ObservableProperty] private string _message = "就绪";
     [ObservableProperty] private string _coreStatusText = "内核状态: 未启动";
     [ObservableProperty] private bool _isCoreRunning;
     [ObservableProperty] private bool _hasUnsavedChanges;
+    [ObservableProperty] private bool _isSaving;
+
+    public bool CanSave => HasUnsavedChanges && !IsSaving;
+
+    partial void OnHasUnsavedChangesChanged(bool value) => OnPropertyChanged(nameof(CanSave));
+
+    partial void OnIsSavingChanged(bool value) => OnPropertyChanged(nameof(CanSave));
 
     public MainViewModel(IUiDispatcher dispatcher)
         : this(new SettingsService(), new MihomoConfigBuilder(), new SubscriptionConfigComposer(),
@@ -86,7 +97,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _telemetry.ConnectionsReceived += frame => _dispatcher.Post(() => Telemetry.Update(frame));
         _telemetry.LogReceived += (_, frame) => _dispatcher.Post(() => Logs.Append(frame.Payload));
         _telemetry.StreamStateChanged += (_, _, _) => _dispatcher.Post(RefreshPushHealth);
-        Settings.PropertyChanged += (_, _) => HasUnsavedChanges = Settings.IsDirty;
+        Settings.PropertyChanged += (_, e) =>
+        {
+            HasUnsavedChanges = Settings.IsDirty;
+            if (!_suppressPreferenceAutoSave
+                && _initialized
+                && !Settings.IsLoading
+                && SettingsViewModel.IsPreferenceProperty(e.PropertyName))
+            {
+                SchedulePreferenceSave();
+            }
+        };
     }
 
     public SettingsViewModel Settings { get; }
@@ -126,6 +147,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             await StartCoreAsync();
         }
+
+        _initialized = true;
     }
 
     /// <summary>托盘与窗口共享同一份状态文本，避免同一个概念散落在三处写入。</summary>
@@ -397,48 +420,249 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private async Task SaveInternalAsync()
     {
-        var previous = _settings;
-        var candidate = CloneSettings();
-        Settings.ApplyTo(candidate);
-        candidate.Subscriptions = Subscriptions.Items.Select(x => CloneSubscription(x.Item)).ToList();
-
-        var startupEnabled = await _windowsStartupService.SetEnabledAsync(candidate.StartWithWindows);
-        var startupBlocked = candidate.StartWithWindows && !startupEnabled;
-        if (startupBlocked)
-        {
-            candidate.StartWithWindows = false;
-        }
-
-        await _settingsService.SaveAsync(candidate);
-
-        _settings = candidate;
-        Subscriptions.Load(_settings);
-        if (startupBlocked)
-        {
-            Settings.StartWithWindows = false;
-            Settings.IsDirty = false;
-        }
-
-        RefreshRuntimeIndicators();
-
-        // 保存即生效：内核运行中优先热重载，只有端点等无法热切换的项变化时才重启。
-        string applied;
+        await _saveGate.WaitAsync();
         try
         {
-            var configPath = WriteMihomoConfigFile(candidate);
-            applied = _processManager.IsRunning
-                ? await ApplyToRunningCoreAsync(previous, candidate, configPath)
-                : "设置已保存，并已生成 mihomo 配置文件。";
+            if (IsSaving)
+            {
+                return;
+            }
+
+            IsSaving = true;
+            _preferenceSaveCancellation?.Cancel();
+
+            var previous = _settings;
+            var candidate = CloneSettings();
+            Settings.ApplyTo(candidate);
+            candidate.Subscriptions = Subscriptions.Items.Select(x => CloneSubscription(x.Item)).ToList();
+
+            var startupEnabled = await _windowsStartupService.SetEnabledAsync(candidate.StartWithWindows);
+            var startupBlocked = candidate.StartWithWindows && !startupEnabled;
+            if (startupBlocked)
+            {
+                candidate.StartWithWindows = false;
+            }
+
+            await PersistSettingsAsync(candidate);
+
+            Subscriptions.Load(_settings);
+            if (startupBlocked)
+            {
+                Settings.StartWithWindows = false;
+            }
+
+            RefreshRuntimeIndicators();
+
+            string applied;
+            try
+            {
+                var configPath = Path.Combine(candidate.Core.WorkingDirectory, "config.yaml");
+                var needsConfig = HasConfigChanges(previous, candidate) || !File.Exists(configPath);
+
+                if (!needsConfig)
+                {
+                    applied = "设置已保存。";
+                }
+                else
+                {
+                    configPath = WriteMihomoConfigFile(candidate);
+                    applied = _processManager.IsRunning
+                        ? $"设置已保存，{await ApplyToRunningCoreAsync(previous, candidate, configPath)}"
+                        : "设置已保存，并已生成 mihomo 配置文件。";
+                }
+            }
+            catch (Exception ex)
+            {
+                Logs.Append($"生成或应用配置失败: {ex.Message}");
+                // 设置文件已经落盘，但运行时配置没应用成功：保持 dirty，方便直接重试保存。
+                var failed = _processManager.IsRunning
+                    ? "设置已保存，但配置应用失败，请重试。"
+                    : "设置已保存，但配置生成失败，请重试。";
+                Message = startupBlocked ? $"{failed.TrimEnd('。')}；{StartupBlockedReason}。" : failed;
+                return;
+            }
+
+            Settings.MarkSaved();
+            Message = startupBlocked ? $"{applied.TrimEnd('。')}；{StartupBlockedReason}。" : applied;
         }
-        catch (Exception ex)
+        finally
         {
-            Logs.Append($"生成或应用配置失败: {ex.Message}");
-            applied = _processManager.IsRunning
-                ? "设置已保存，但配置生成/应用失败，内核未重载。"
-                : "设置已保存，但内核重启失败，请查看日志。";
+            IsSaving = false;
+            _saveGate.Release();
+        }
+    }
+
+    /// <summary>撤销本次编辑，回到最近一次成功保存的设置。</summary>
+    [RelayCommand]
+    private void UndoChanges()
+    {
+        _preferenceSaveCancellation?.Cancel();
+        Settings.LoadFrom(_settings);
+        Message = "已撤销未保存的修改。";
+    }
+
+    /// <summary>
+    /// 重置配置类字段为默认值，但保留订阅列表与当前订阅标记；结果只进入草稿，
+    /// 用户仍可通过“撤销”恢复，或点击保存后生效。
+    /// </summary>
+    [RelayCommand]
+    private void RestoreDefaults()
+    {
+        _preferenceSaveCancellation?.Cancel();
+
+        var defaults = AppInstance.CreateDefaultSettings();
+        ApplyDefaults(defaults);
+        defaults.Subscriptions = _settings.Subscriptions.Select(CloneSubscription).ToList();
+        defaults.ActiveSubscriptionName = _settings.ActiveSubscriptionName;
+        defaults.SubscriptionRules = [.. _settings.SubscriptionRules];
+
+        Settings.LoadFrom(defaults);
+        Settings.MarkDirty();
+        Message = "已恢复默认设置，点击保存后生效。";
+    }
+
+    private void SchedulePreferenceSave()
+    {
+        _preferenceSaveCancellation?.Cancel();
+        var cancellation = new CancellationTokenSource();
+        _preferenceSaveCancellation = cancellation;
+        _ = SavePreferencesAfterDelayAsync(cancellation.Token);
+    }
+
+    private async Task SavePreferencesAfterDelayAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(500, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
         }
 
-        Message = startupBlocked ? $"{applied.TrimEnd('。')}；{StartupBlockedReason}。" : applied;
+        _dispatcher.Post(() => _ = SavePreferencesNowAsync());
+    }
+
+    public Task SavePreferencesNowAsync() => RunSafelyAsync(SavePreferencesCoreAsync);
+
+    private async Task SavePreferencesCoreAsync()
+    {
+        if (!_initialized || Settings.IsLoading)
+        {
+            return;
+        }
+
+        await _saveGate.WaitAsync();
+        try
+        {
+            if (IsSaving)
+            {
+                return;
+            }
+
+            var previous = _settings;
+            var candidate = CloneSettings();
+            Settings.ApplyPreferencesTo(candidate);
+
+            if (!PreferencesDiffer(previous, candidate))
+            {
+                Settings.MarkPreferencesSaved();
+                return;
+            }
+
+            var startupBlocked = false;
+            if (candidate.StartWithWindows != previous.StartWithWindows)
+            {
+                var startupEnabled = await _windowsStartupService.SetEnabledAsync(candidate.StartWithWindows);
+                startupBlocked = candidate.StartWithWindows && !startupEnabled;
+                if (startupBlocked)
+                {
+                    candidate.StartWithWindows = false;
+                }
+            }
+
+            await PersistSettingsAsync(candidate);
+
+            if (startupBlocked)
+            {
+                _suppressPreferenceAutoSave = true;
+                try
+                {
+                    Settings.StartWithWindows = false;
+                }
+                finally
+                {
+                    _suppressPreferenceAutoSave = false;
+                }
+
+                Message = $"偏好已保存，但{StartupBlockedReason}。";
+            }
+
+            Settings.MarkPreferencesSaved();
+        }
+        finally
+        {
+            _saveGate.Release();
+        }
+    }
+
+    private static bool PreferencesDiffer(AppSettings previous, AppSettings next)
+    {
+        return previous.StatsRefreshSeconds != next.StatsRefreshSeconds
+            || previous.StartCoreOnProgramStart != next.StartCoreOnProgramStart
+            || previous.StartWithWindows != next.StartWithWindows
+            || !string.Equals(previous.ProxyTest.Url, next.ProxyTest.Url, StringComparison.Ordinal)
+            || previous.ProxyTest.TimeoutMilliseconds != next.ProxyTest.TimeoutMilliseconds;
+    }
+
+    private static bool HasConfigChanges(AppSettings previous, AppSettings next)
+    {
+        return !CoreEquals(previous.Core, next.Core)
+            || !DnsEquals(previous.Dns, next.Dns)
+            || !GeoxEquals(previous.GeoxUrls, next.GeoxUrls)
+            || previous.GeoDataMode != next.GeoDataMode
+            || previous.GeoAutoUpdate != next.GeoAutoUpdate
+            || previous.GeoUpdateIntervalHours != next.GeoUpdateIntervalHours
+            || !string.Equals(previous.RuleOverrides, next.RuleOverrides, StringComparison.Ordinal)
+            || !previous.SubscriptionRules.SequenceEqual(next.SubscriptionRules, StringComparer.Ordinal);
+    }
+
+    private static bool CoreEquals(CoreRuntimeSettings previous, CoreRuntimeSettings next)
+    {
+        return string.Equals(previous.CoreExecutablePath, next.CoreExecutablePath, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(previous.WorkingDirectory, next.WorkingDirectory, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(previous.ExternalControllerHost, next.ExternalControllerHost, StringComparison.OrdinalIgnoreCase)
+            && previous.ExternalControllerPort == next.ExternalControllerPort
+            && string.Equals(previous.Secret, next.Secret, StringComparison.Ordinal)
+            && previous.MixedPort == next.MixedPort
+            && previous.SocksPort == next.SocksPort
+            && previous.HttpPort == next.HttpPort
+            && previous.EnableSystemProxy == next.EnableSystemProxy
+            && previous.BypassLocalNetworks == next.BypassLocalNetworks;
+    }
+
+    private static bool DnsEquals(DnsSettings previous, DnsSettings next)
+    {
+        return previous.Enable == next.Enable
+            && string.Equals(previous.Listen, next.Listen, StringComparison.Ordinal)
+            && previous.Ipv6 == next.Ipv6
+            && string.Equals(previous.EnhancedMode, next.EnhancedMode, StringComparison.Ordinal)
+            && string.Equals(previous.FakeIpRange, next.FakeIpRange, StringComparison.Ordinal)
+            && previous.FakeIpFilter.SequenceEqual(next.FakeIpFilter, StringComparer.Ordinal)
+            && previous.DefaultNameserver.SequenceEqual(next.DefaultNameserver, StringComparer.Ordinal)
+            && previous.Nameserver.SequenceEqual(next.Nameserver, StringComparer.Ordinal)
+            && previous.Fallback.SequenceEqual(next.Fallback, StringComparer.Ordinal)
+            && previous.FallbackFilterGeoIp == next.FallbackFilterGeoIp
+            && string.Equals(previous.FallbackFilterGeoIpCode, next.FallbackFilterGeoIpCode, StringComparison.Ordinal)
+            && previous.FallbackFilterIpCidr.SequenceEqual(next.FallbackFilterIpCidr, StringComparer.Ordinal);
+    }
+
+    private static bool GeoxEquals(GeoxUrlSettings previous, GeoxUrlSettings next)
+    {
+        return string.Equals(previous.GeoIp, next.GeoIp, StringComparison.Ordinal)
+            && string.Equals(previous.GeoSite, next.GeoSite, StringComparison.Ordinal)
+            && string.Equals(previous.Mmdb, next.Mmdb, StringComparison.Ordinal)
+            && string.Equals(previous.Asn, next.Asn, StringComparison.Ordinal);
     }
 
     /// <summary>热重载不会改变 API 端点；走到这里说明设置里改了内核路径、工作目录或控制端口/密钥。</summary>
@@ -480,14 +704,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                     Logs.Append($"刷新代理组失败: {ex.Message}");
                 }
 
-                return "设置已保存，内核配置已热重载。";
+                return "内核配置已热重载。";
             }
         }
 
         StopCoreCore(quiet: false);
         Logs.Append("内核已停止，正在应用新设置并重启。");
         await StartInternalAsync(localProviders: null);
-        return "设置已保存，内核已重启。";
+        return "内核已重启。";
     }
 
     /// <summary>热重载只能改配置，系统代理是应用侧状态，需要按新端口单独同步。</summary>
@@ -521,6 +745,24 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ? "并行调试实例不注册开机自启"
         : "开机自启被系统禁用";
 
+    private async Task PersistSettingsAsync(AppSettings settings)
+    {
+        await _settingsService.SaveAsync(settings);
+        _settings = settings;
+    }
+
+    /// <summary>写配置并应用到内核；订阅与设置页共用同一条路径。</summary>
+    private async Task<string> ApplyCurrentConfigurationAsync(
+        AppSettings previous,
+        AppSettings next,
+        HashSet<string>? localProviders = null)
+    {
+        var configPath = WriteMihomoConfigFile(next, localProviders);
+        return _processManager.IsRunning
+            ? await ApplyToRunningCoreAsync(previous, next, configPath)
+            : "已生成 mihomo 配置文件。";
+    }
+
     /// <summary>
     /// 复制当前已保存设置，作为界面编辑的落点。所有嵌套对象都必须深拷贝，
     /// 否则 ApplyTo 会在保存成功前改写 _settings（保存失败时内存状态已脏）。
@@ -535,6 +777,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             SubscriptionRules = [.. _settings.SubscriptionRules],
             GeoxUrls = CloneGeoxUrls(_settings.GeoxUrls),
             Dns = CloneDns(_settings.Dns),
+            ProxyTest = CloneProxyTest(_settings.ProxyTest),
             RuleOverrides = _settings.RuleOverrides,
             StatsRefreshSeconds = _settings.StatsRefreshSeconds,
             StartCoreOnProgramStart = _settings.StartCoreOnProgramStart,
@@ -579,9 +822,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         Asn = geox.Asn,
     };
 
-    private static DnsSettings CloneDns(DnsSettings dns) => new()
+    private static ProxyTestSettings CloneProxyTest(ProxyTestSettings proxyTest) => new()
     {
-        Enable = dns.Enable,
+        Url = proxyTest.Url,
+        TimeoutMilliseconds = proxyTest.TimeoutMilliseconds,
+    };
+
+    private static DnsSettings CloneDns(DnsSettings dns) => new()
+    {        Enable = dns.Enable,
         Listen = dns.Listen,
         Ipv6 = dns.Ipv6,
         EnhancedMode = dns.EnhancedMode,
@@ -599,7 +847,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         Directory.CreateDirectory(settings.Core.WorkingDirectory);
         var path = Path.Combine(settings.Core.WorkingDirectory, "config.yaml");
-        File.WriteAllText(path, BuildEffectiveConfig(settings, localProviders), new UTF8Encoding(false));
+        var tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            File.WriteAllText(tempPath, BuildEffectiveConfig(settings, localProviders), new UTF8Encoding(false));
+            File.Move(tempPath, path, overwrite: true);
+        }
+        finally
+        {
+            TryDelete(tempPath);
+        }
+
         return path;
     }
 
@@ -650,6 +908,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
 
         var existing = _settings.Subscriptions.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+        var previous = CloneSettings();
         bool isActive;
         if (existing is null)
         {
@@ -671,7 +930,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             Message = "已更新订阅。";
         }
 
-        await _settingsService.SaveAsync(_settings);
+        await PersistSettingsAsync(_settings);
         Subscriptions.Load(_settings);
 
         var subscription = _settings.Subscriptions.First(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
@@ -683,14 +942,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
 
         File.Copy(GetSubscriptionFilePath(name), GetActiveSubscriptionPath(_settings), overwrite: true);
-        if (_processManager.IsRunning)
-        {
-            StopCoreCore(quiet: false);
-            Logs.Append("内核已停止，准备使用新订阅文件重启。");
-        }
-
-        await StartInternalAsync(new HashSet<string> { MihomoConfigBuilder.NormalizeName(name) });
-        Message = "已下载订阅文件并已重载内核。";
+        var applied = await ApplyCurrentConfigurationAsync(previous, _settings);
+        Message = $"已下载订阅文件，{applied}";
     }
 
     [RelayCommand]
@@ -701,6 +954,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var selected = Subscriptions.SelectedSubscription
             ?? throw new InvalidOperationException("请先选择要删除的订阅。");
 
+        var previous = CloneSettings();
         var wasActive = string.Equals(
             _settings.ActiveSubscriptionName,
             selected.Name,
@@ -715,7 +969,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
 
         // 先落盘再删文件：保存失败时不会出现设置仍引用、文件却已丢失的情况。
-        await _settingsService.SaveAsync(_settings);
+        await PersistSettingsAsync(_settings);
 
         if (wasActive)
         {
@@ -725,9 +979,24 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         TryDelete(subscriptionPath);
 
         Subscriptions.Load(_settings);
-        Message = _processManager.IsRunning
-            ? "订阅已删除；当前内核仍使用旧配置，重启内核后生效。"
-            : "订阅已删除。";
+
+        if (wasActive && _processManager.IsRunning)
+        {
+            try
+            {
+                var applied = await ApplyCurrentConfigurationAsync(previous, _settings);
+                Message = $"订阅已删除，{applied}";
+                return;
+            }
+            catch (Exception ex)
+            {
+                Logs.Append($"删除订阅后应用配置失败: {ex.Message}");
+                Message = "订阅已删除；当前内核仍使用旧配置，重启内核后生效。";
+                return;
+            }
+        }
+
+        Message = "订阅已删除。";
     }
 
     [RelayCommand]
@@ -745,9 +1014,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
 
         SubscriptionUsage.DisableOthers(_settings, selected.Name);
+        var previous = CloneSettings();
         selected.Item.Enabled = true;
         _settings.ActiveSubscriptionName = selected.Name;
-        await _settingsService.SaveAsync(_settings);
+        await PersistSettingsAsync(_settings);
         Subscriptions.Load(_settings);
         Logs.Append($"已激活订阅: {selected.Name}");
 
@@ -757,14 +1027,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _settings.SubscriptionRules = SubscriptionParser.Parse(content).Rules;
         Rules.SetSubscriptionRules(_settings.SubscriptionRules);
 
-        if (_processManager.IsRunning)
-        {
-            StopCoreCore(quiet: false);
-            Logs.Append("内核已停止，准备使用新订阅重启。");
-        }
-
-        await StartInternalAsync(new HashSet<string> { MihomoConfigBuilder.NormalizeName(selected.Name) });
-        Message = $"已激活订阅: {selected.Name}";
+        var applied = await ApplyCurrentConfigurationAsync(previous, _settings);
+        Message = $"已激活订阅: {selected.Name}，{applied}";
     }
 
     private async Task DownloadAndSaveSubscriptionAsync(SubscriptionItem subscription)
@@ -929,13 +1193,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private (string Url, int Timeout) ReadDelayTestArguments()
     {
-        var url = ProxyGroups.DelayTestUrl.Trim();
+        var url = Settings.ProxyTestUrl.Trim();
         if (!Uri.TryCreate(url, UriKind.Absolute, out _))
         {
             throw new InvalidOperationException("测试 URL 无效。");
         }
 
-        return (url, SettingsParsing.ParsePositiveInt(ProxyGroups.DelayTestTimeoutText, "超时(ms)"));
+        return (url, SettingsParsing.ParsePositiveInt(Settings.ProxyTestTimeoutText, "超时(ms)"));
     }
 
     private string NameOfDelay(string proxyName)
@@ -1332,6 +1596,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _preferenceSaveCancellation?.Cancel();
+        _preferenceSaveCancellation?.Dispose();
         StopFallbackPolling();
         _telemetry.Dispose();
         _apiClient.Dispose();

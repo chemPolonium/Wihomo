@@ -9,3 +9,7 @@ mihomo-src/
 *.bak
 TestResults/
 *.received.txt
+
+# 本地调试设置副本（绝不提交）
+*.local-settings.json
+dev-profile/

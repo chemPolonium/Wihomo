@@ -11,7 +11,7 @@
             <TextBlock
                 AutomationProperties.HeadingLevel="Level1"
                 Style="{StaticResource TitleTextBlockStyle}"
-                Text="内核设置" />
+                Text="内核" />
             <Expander
                 Header="基本配置"
                 HorizontalAlignment="Stretch"
@@ -66,36 +66,9 @@
                         <TextBox
                             Grid.Row="2"
                             Grid.Column="1"
-                            Header="统计刷新间隔（秒）"
-                            InputScope="Number"
-                            Text="{x:Bind ViewModel.Settings.StatsRefreshText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            Header="Secret"
+                            Text="{x:Bind ViewModel.Settings.Secret, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </Grid>
-
-                    <TextBox
-                        Header="Secret"
-                        Text="{x:Bind ViewModel.Settings.Secret, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                    <StackPanel Spacing="8">
-                        <CheckBox
-                            Content="启动程序时自动启动内核"
-                            IsChecked="{x:Bind ViewModel.Settings.StartCoreOnProgramStart, Mode=TwoWay}" />
-                        <CheckBox
-                            Content="登录用户时启动 Wihomo"
-                            IsChecked="{x:Bind ViewModel.Settings.StartWithWindows, Mode=TwoWay}"
-                            IsEnabled="{x:Bind ViewModel.Settings.CanStartWithWindows}" />
-                        <CheckBox
-                            Content="启动内核时启用系统代理，停止内核时关闭"
-                            IsChecked="{x:Bind ViewModel.Settings.EnableSystemProxy, Mode=TwoWay}" />
-                        <CheckBox
-                            Content="让本地与局域网连接绕过代理"
-                            IsChecked="{x:Bind ViewModel.Settings.BypassLocalNetworks, Mode=TwoWay}"
-                            ToolTipService.ToolTip="内网 IP 与 .lan/.local/.home.arpa 域名直连，打印机/NAS/路由器不经过代理" />
-                    </StackPanel>
-
-                    <Button
-                        HorizontalAlignment="Left"
-                        Content="保存设置"
-                        Command="{x:Bind ViewModel.SaveSettingsCommand}" />
                 </StackPanel>
             </Expander>
         </StackPanel>

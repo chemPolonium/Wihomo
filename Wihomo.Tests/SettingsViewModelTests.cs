@@ -124,7 +124,7 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public void 加载不脏_编辑变脏_保存后重新干净()
+    public void 加载不脏_编辑变脏_保存后调用MarkSaved才重新干净()
     {
         var settings = NewPopulatedSettings();
         var vm = new SettingsViewModel();
@@ -134,10 +134,64 @@ public class SettingsViewModelTests
 
         vm.MixedPortText = "7899";
         Assert.True(vm.IsDirty);
+        Assert.True(vm.HasConfigChanges);
 
         vm.ApplyTo(settings);
+        Assert.True(vm.IsDirty);
+
+        vm.MarkSaved();
         Assert.False(vm.IsDirty);
+        Assert.False(vm.HasConfigChanges);
         Assert.Equal(7899, settings.Core.MixedPort);
+    }
+
+    [Fact]
+    public void 未修改的非法字段不阻塞其它字段保存()
+    {
+        var settings = NewPopulatedSettings();
+        settings.GeoxUrls.GeoIp = "不是 URL";
+        var vm = new SettingsViewModel();
+        vm.LoadFrom(settings);
+
+        vm.MixedPortText = "7899";
+        vm.ApplyTo(settings);
+
+        Assert.Equal(7899, settings.Core.MixedPort);
+        Assert.Equal("不是 URL", settings.GeoxUrls.GeoIp);
+    }
+
+    [Fact]
+    public void 自动保存偏好后配置类修改仍然保持未保存()
+    {
+        var settings = NewPopulatedSettings();
+        var vm = new SettingsViewModel();
+        vm.LoadFrom(settings);
+
+        vm.MixedPortText = "7899";
+        vm.ProxyTestUrl = "https://example.com/generate_204";
+        Assert.True(vm.HasPreferenceChanges);
+        Assert.True(vm.HasConfigChanges);
+
+        vm.MarkPreferencesSaved();
+
+        Assert.False(vm.HasPreferenceChanges);
+        Assert.True(vm.HasConfigChanges);
+        Assert.True(vm.IsDirty);
+    }
+
+    [Fact]
+    public void 测速设置写回ProxyTest字段()
+    {
+        var settings = NewPopulatedSettings();
+        var vm = new SettingsViewModel();
+        vm.LoadFrom(settings);
+
+        vm.ProxyTestUrl = "https://example.com/generate_204";
+        vm.ProxyTestTimeoutText = "8000";
+        vm.ApplyTo(settings);
+
+        Assert.Equal("https://example.com/generate_204", settings.ProxyTest.Url);
+        Assert.Equal(8000, settings.ProxyTest.TimeoutMilliseconds);
     }
 
     [Fact]

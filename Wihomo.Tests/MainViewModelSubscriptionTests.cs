@@ -118,15 +118,18 @@ public class MainViewModelSubscriptionTests : IDisposable
         Assert.NotSame(original.Dns.Fallback, clone.Dns.Fallback);
         Assert.NotSame(original.Dns.FallbackFilterIpCidr, clone.Dns.FallbackFilterIpCidr);
         Assert.NotSame(original.GeoxUrls, clone.GeoxUrls);
+        Assert.NotSame(original.ProxyTest, clone.ProxyTest);
         Assert.NotSame(original.Subscriptions, clone.Subscriptions);
         Assert.NotSame(original.Subscriptions[0], clone.Subscriptions[0]);
         Assert.NotSame(original.SubscriptionRules, clone.SubscriptionRules);
 
         clone.Dns.Nameserver.Add("9.9.9.9");
+        clone.ProxyTest.Url = "https://changed.example";
         clone.Subscriptions[0].Name = "已修改";
         clone.SubscriptionRules.Add("MATCH,DIRECT");
 
         Assert.DoesNotContain("9.9.9.9", original.Dns.Nameserver);
+        Assert.NotEqual("https://changed.example", original.ProxyTest.Url);
         Assert.NotEqual("已修改", original.Subscriptions[0].Name);
         Assert.Empty(original.SubscriptionRules);
     }
@@ -146,6 +149,53 @@ public class MainViewModelSubscriptionTests : IDisposable
         Assert.True(File.Exists(configPath));
         Assert.Contains("mixed-port", File.ReadAllText(configPath));
         Assert.Contains("已生成 mihomo 配置文件", _viewModel.Message);
+    }
+
+    [Fact]
+    public async Task 偏好设置自动保存但不会提交未保存的配置修改()
+    {
+        await _viewModel.InitializeAsync();
+
+        _viewModel.Settings.StartCoreOnProgramStart = true;
+        _viewModel.Settings.ProxyTestUrl = "https://example.com/generate_204";
+        _viewModel.Settings.MixedPortText = "7899";
+
+        await Task.Delay(1200);
+
+        var saved = ReadSettings();
+        Assert.True(saved.StartCoreOnProgramStart);
+        Assert.Equal("https://example.com/generate_204", saved.ProxyTest.Url);
+        Assert.Equal(7890, saved.Core.MixedPort);
+        Assert.True(_viewModel.HasUnsavedChanges);
+    }
+
+    [Fact]
+    public async Task 撤销恢复到最近一次保存的设置()
+    {
+        await _viewModel.InitializeAsync();
+        var originalPort = _viewModel.Settings.MixedPortText;
+
+        _viewModel.Settings.MixedPortText = "7999";
+        Assert.True(_viewModel.HasUnsavedChanges);
+
+        _viewModel.UndoChangesCommand.Execute(null);
+
+        Assert.Equal(originalPort, _viewModel.Settings.MixedPortText);
+        Assert.False(_viewModel.HasUnsavedChanges);
+    }
+
+    [Fact]
+    public async Task 恢复默认只改草稿不立即落盘()
+    {
+        await _viewModel.InitializeAsync();
+        var before = File.ReadAllText(_settingsPath);
+
+        _viewModel.Settings.EnableDns = false;
+        _viewModel.RestoreDefaultsCommand.Execute(null);
+
+        Assert.True(_viewModel.Settings.EnableDns);
+        Assert.True(_viewModel.HasUnsavedChanges);
+        Assert.Equal(before, File.ReadAllText(_settingsPath));
     }
 
     public void Dispose()

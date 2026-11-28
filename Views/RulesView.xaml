@@ -16,57 +16,84 @@
         <TextBlock
             AutomationProperties.HeadingLevel="Level1"
             Style="{StaticResource TitleTextBlockStyle}"
-            Text="规则" />
+            Text="规则与覆写" />
 
-        <CommandBar
-            Grid.Row="1"
-            HorizontalAlignment="Left"
-            DefaultLabelPosition="Right">
-            <AppBarButton
-                Icon="Refresh"
-                Label="刷新"
-                Command="{x:Bind ViewModel.RefreshRulesCommand}" />
-        </CommandBar>
-
-        <Grid Grid.Row="2" ColumnSpacing="16">
+        <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1*" />
-                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <ListView ItemsSource="{x:Bind ViewModel.Rules.SubscriptionRules}">
-                <ListView.Header>
-                    <TextBlock
-                        Style="{StaticResource BodyStrongTextBlockStyle}"
-                        Text="订阅规则" />
-                </ListView.Header>
-                <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="x:String">
-                        <TextBlock
-                            IsTextSelectionEnabled="True"
-                            Text="{x:Bind}"
-                            TextWrapping="Wrap" />
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
+            <SelectorBar
+                x:Name="RulesSelector"
+                HorizontalAlignment="Left"
+                SelectionChanged="RulesSelector_SelectionChanged">
+                <SelectorBarItem Text="规则" IsSelected="True" />
+                <SelectorBarItem x:Name="OverridesSelectorItem" Text="YAML 覆写" />
+            </SelectorBar>
 
-            <ListView
+            <Button
+                x:Name="RefreshRulesButton"
                 Grid.Column="1"
-                ItemsSource="{x:Bind ViewModel.Rules.ActiveRules}">
-                <ListView.Header>
-                    <TextBlock
-                        Style="{StaticResource BodyStrongTextBlockStyle}"
-                        Text="当前规则" />
-                </ListView.Header>
-                <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="x:String">
+                VerticalAlignment="Center"
+                Command="{x:Bind ViewModel.RefreshRulesCommand}"
+                Content="刷新" />
+        </Grid>
+
+        <Grid Grid.Row="2">
+            <Grid x:Name="RulesPanel" ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1*" />
+                    <ColumnDefinition Width="1*" />
+                </Grid.ColumnDefinitions>
+
+                <ListView ItemsSource="{x:Bind ViewModel.Rules.SubscriptionRules}">
+                    <ListView.Header>
                         <TextBlock
-                            IsTextSelectionEnabled="True"
-                            Text="{x:Bind}"
-                            TextWrapping="Wrap" />
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
+                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Text="订阅规则" />
+                    </ListView.Header>
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <TextBlock
+                                IsTextSelectionEnabled="True"
+                                Text="{x:Bind}"
+                                TextWrapping="Wrap" />
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <ListView
+                    Grid.Column="1"
+                    ItemsSource="{x:Bind ViewModel.Rules.ActiveRules}">
+                    <ListView.Header>
+                        <TextBlock
+                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Text="当前规则" />
+                    </ListView.Header>
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <TextBlock
+                                IsTextSelectionEnabled="True"
+                                Text="{x:Bind}"
+                                TextWrapping="Wrap" />
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Grid>
+
+            <Grid x:Name="OverridesPanel" Visibility="Collapsed">
+                <TextBox
+                    x:Name="OverridesTextBox"
+                    AcceptsReturn="True"
+                    FontFamily="Cascadia Mono, Consolas, Courier New"
+                    KeyDown="OverridesTextBox_KeyDown"
+                    MinHeight="400"
+                    ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                    ScrollViewer.VerticalScrollBarVisibility="Auto"
+                    Text="{x:Bind ViewModel.Settings.RuleOverrides, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                    TextWrapping="NoWrap" />
+            </Grid>
         </Grid>
     </Grid>
 </UserControl>

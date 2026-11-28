@@ -39,6 +39,14 @@ $env:WIHOMO_INSTANCE_SUFFIX = "dev"
 
 独立实例使用 `%AppData%\Wihomo-dev`、`%LocalAppData%\Wihomo-dev\runtime` 与 8090/8091/8092/9095，不接管开机自启，也不会和正式实例互相激活或覆盖配置。
 
+如果需要在调试时使用当前安装版的真实设置，但不修改原设置：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File Installer\start-dev-profile.ps1
+```
+
+脚本会把设置和订阅复制到 `%LocalAppData%\Wihomo\DevProfile`，改写为独立端口并关闭系统代理与开机自启，调试实例只读写这份副本。原始 `settings.json`、订阅文件和系统代理不会变化。
+
 ## 测试
 
 ```bash
@@ -73,7 +81,7 @@ powershell -ExecutionPolicy Bypass -File Installer\build-msix.ps1 -Register
 > ```
 
 
-> 从旧版（Inno Setup 安装的 WPF 版本）升级时，请先在“设置 → 应用”中卸载旧版，再安装 MSIX，避免两个版本同时开机自启。用户设置仍保存在 `%AppData%\Wihomo\settings.json`，升级后会继续沿用。
+> 从旧版（Inno Setup 安装的 WPF 版本）升级时，请先在“设置 → 应用”中卸载旧版，再安装 MSIX，避免两个版本同时开机自启。MSIX 打包版的 Roaming 数据会被系统重定向到 `%LOCALAPPDATA%\Packages\<PackageFamilyName>\LocalCache\Roaming\Wihomo\settings.json`；未打包的调试版才直接使用 `%AppData%\Wihomo\settings.json`。卸载或重新注册包之前请先备份该目录。
 
 卸载：
 
@@ -81,7 +89,7 @@ powershell -ExecutionPolicy Bypass -File Installer\build-msix.ps1 -Register
 Get-AppxPackage chemPolonium.Wihomo | Remove-AppxPackage
 ```
 
-> 开发者模式松散注册的布局位于 `%LOCALAPPDATA%\Wihomo\DevLayout`；`Remove-AppxPackage` 不会删除该目录，确认不再使用后可手动删除。
+> 开发者模式松散注册的布局位于 `%LOCALAPPDATA%\Wihomo\DevLayout`；`Remove-AppxPackage` 不会删除该目录，确认不再使用后可手动删除。重新注册脚本会在卸载前备份包数据，并在注册后恢复。
 
 ## 项目结构
 

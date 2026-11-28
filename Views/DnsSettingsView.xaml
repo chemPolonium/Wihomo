@@ -66,11 +66,6 @@
                         ScrollViewer.VerticalScrollBarVisibility="Auto"
                         Text="{x:Bind ViewModel.Settings.FallbackText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                         TextWrapping="Wrap" />
-
-                    <Button
-                        HorizontalAlignment="Left"
-                        Content="保存设置"
-                        Command="{x:Bind ViewModel.SaveSettingsCommand}" />
                 </StackPanel>
             </Expander>
         </StackPanel>

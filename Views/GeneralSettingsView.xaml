@@ -1,0 +1,74 @@
+<UserControl
+    x:Class="Wihomo.Views.GeneralSettingsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Padding="24" Spacing="16">
+            <TextBlock
+                AutomationProperties.HeadingLevel="Level1"
+                Style="{StaticResource TitleTextBlockStyle}"
+                Text="通用" />
+
+            <Expander
+                Header="启动"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Stretch"
+                IsExpanded="True">
+                <StackPanel Spacing="8">
+                    <CheckBox
+                        Content="启动程序时自动启动内核"
+                        IsChecked="{x:Bind ViewModel.Settings.StartCoreOnProgramStart, Mode=TwoWay}" />
+                    <CheckBox
+                        Content="登录用户时启动 Wihomo"
+                        IsChecked="{x:Bind ViewModel.Settings.StartWithWindows, Mode=TwoWay}"
+                        IsEnabled="{x:Bind ViewModel.Settings.CanStartWithWindows}" />
+                </StackPanel>
+            </Expander>
+
+            <Expander
+                Header="网络"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Stretch"
+                IsExpanded="True">
+                <StackPanel Spacing="8">
+                    <CheckBox
+                        Content="启动内核时启用系统代理，停止内核时关闭"
+                        IsChecked="{x:Bind ViewModel.Settings.EnableSystemProxy, Mode=TwoWay}" />
+                    <CheckBox
+                        Content="让本地与局域网连接绕过代理"
+                        IsChecked="{x:Bind ViewModel.Settings.BypassLocalNetworks, Mode=TwoWay}"
+                        ToolTipService.ToolTip="内网 IP 与 .lan/.local/.home.arpa 域名直连，打印机/NAS/路由器不经过代理" />
+                </StackPanel>
+            </Expander>
+
+            <Expander
+                Header="界面与测速"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Stretch"
+                IsExpanded="True">
+                <StackPanel Spacing="16">
+                    <TextBox
+                        Header="统计刷新间隔（秒）"
+                        InputScope="Number"
+                        Text="{x:Bind ViewModel.Settings.StatsRefreshText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                    <TextBox
+                        Header="测速 URL"
+                        Text="{x:Bind ViewModel.Settings.ProxyTestUrl, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                    <TextBox
+                        Header="测速超时（ms）"
+                        InputScope="Number"
+                        Text="{x:Bind ViewModel.Settings.ProxyTestTimeoutText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                </StackPanel>
+            </Expander>
+
+            <Button
+                HorizontalAlignment="Left"
+                Content="恢复默认设置"
+                Command="{x:Bind ViewModel.RestoreDefaultsCommand}" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

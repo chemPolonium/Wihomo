@@ -18,7 +18,12 @@ public sealed class SettingsService
     /// </param>
     public SettingsService(string? settingsPath = null)
     {
-        _settingsPath = settingsPath ?? Path.Combine(AppInstance.SettingsDirectory, "settings.json");
+        // 调试实例可通过环境变量指向一份配置副本，避免读写正式设置。
+        var overridePath = Environment.GetEnvironmentVariable("WIHOMO_SETTINGS_PATH");
+        _settingsPath = settingsPath
+            ?? (!string.IsNullOrWhiteSpace(overridePath)
+                ? Path.GetFullPath(overridePath)
+                : Path.Combine(AppInstance.SettingsDirectory, "settings.json"));
     }
 
     public string SettingsPath => _settingsPath;

@@ -36,12 +36,12 @@ public sealed partial class MainWindow : Window
 
     public IRelayCommand ShowWindowCommand { get; }
 
-    public IRelayCommand ExitCommand { get; }
+    public IAsyncRelayCommand ExitCommand { get; }
 
     public MainWindow()
     {
         ShowWindowCommand = new RelayCommand(ShowMainWindow);
-        ExitCommand = new RelayCommand(ExitApplication);
+        ExitCommand = new AsyncRelayCommand(ExitApplicationAsync);
 
         ViewModel = new MainViewModel(new WinUiDispatcher(DispatcherQueue));
         InitializeComponent();
@@ -173,8 +173,8 @@ public sealed partial class MainWindow : Window
             "rules" => new RulesView(ViewModel),
             "connections" => new ConnectionsView(ViewModel),
             "logs" => new LogsView(ViewModel),
+            "general-settings" => new GeneralSettingsView(ViewModel),
             "geo-resources" => new GeoResourcesView(ViewModel),
-            "yaml-overrides" => new YamlOverridesView(ViewModel),
             "core-settings" => new CoreSettingsView(ViewModel),
             "dns-settings" => new DnsSettingsView(ViewModel),
             _ => throw new ArgumentOutOfRangeException(nameof(tag), tag, "Unknown navigation tag."),
@@ -201,6 +201,12 @@ public sealed partial class MainWindow : Window
         args.Handled = true;
     }
 
+    private async void SaveShortcut_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        await ViewModel.SaveSettingsCommand.ExecuteAsync(null);
+    }
+
     internal void RestoreAndActivate()
     {
         AppWindow.Show();
@@ -222,11 +228,42 @@ public sealed partial class MainWindow : Window
         DispatcherQueue.TryEnqueue(RestoreAndActivate);
     }
 
-    private void ExitApplication()
+    private async Task ExitApplicationAsync()
     {
         if (_isExiting)
         {
             return;
+        }
+
+        if (ViewModel.HasUnsavedChanges)
+        {
+            RestoreAndActivate();
+
+            var dialog = new ContentDialog
+            {
+                XamlRoot = Root.XamlRoot,
+                Title = "未保存的更改",
+                Content = "设置尚未保存。退出前要保存吗？",
+                PrimaryButtonText = "保存并退出",
+                SecondaryButtonText = "放弃更改",
+                CloseButtonText = "取消",
+                DefaultButton = ContentDialogButton.Primary,
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.None)
+            {
+                return;
+            }
+
+            if (result == ContentDialogResult.Primary)
+            {
+                await ViewModel.SaveSettingsCommand.ExecuteAsync(null);
+                if (ViewModel.HasUnsavedChanges)
+                {
+                    return;
+                }
+            }
         }
 
         _isExiting = true;

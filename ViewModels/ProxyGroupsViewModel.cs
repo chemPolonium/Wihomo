@@ -55,8 +55,6 @@ public sealed partial class ProxyGroupsViewModel : ObservableObject
     [ObservableProperty] private string _currentSelectionText = "当前选择: -";
     [ObservableProperty] private string _allDelayStatusText = "等待测速";
     [ObservableProperty] private bool _isTestingAllDelays;
-    [ObservableProperty] private string _delayTestUrl = "http://cp.cloudflare.com/generate_204";
-    [ObservableProperty] private string _delayTestTimeoutText = "5000";
 
     private Func<string, string> _delayOf = _ => "未测试";
 

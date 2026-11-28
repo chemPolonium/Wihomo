@@ -15,6 +15,10 @@
     <Grid x:Name="Root">
         <Grid.KeyboardAccelerators>
             <KeyboardAccelerator Key="Escape" Invoked="Escape_Invoked" />
+            <KeyboardAccelerator
+                Key="S"
+                Modifiers="Control"
+                Invoked="SaveShortcut_Invoked" />
         </Grid.KeyboardAccelerators>
 
         <Grid.RowDefinitions>
@@ -76,10 +80,18 @@
                 <NavigationViewItem Content="规则" Tag="rules" Icon="List" />
                 <NavigationViewItem Content="连接" Tag="connections" Icon="Globe" />
                 <NavigationViewItem Content="日志" Tag="logs" Icon="Document" />
-                <NavigationViewItem Content="外部资源" Tag="geo-resources" Icon="World" />
-                <NavigationViewItem Content="YAML 覆写" Tag="yaml-overrides" Icon="Edit" />
-                <NavigationViewItem Content="内核设置" Tag="core-settings" Icon="Setting" />
-                <NavigationViewItem Content="DNS 设置" Tag="dns-settings" Icon="Sync" />
+                <NavigationViewItem
+                    Content="设置"
+                    Icon="Setting"
+                    IsExpanded="False"
+                    SelectsOnInvoked="False">
+                    <NavigationViewItem.MenuItems>
+                        <NavigationViewItem Content="通用" Tag="general-settings" Icon="Setting" />
+                        <NavigationViewItem Content="内核" Tag="core-settings" Icon="Repair" />
+                        <NavigationViewItem Content="DNS" Tag="dns-settings" Icon="Sync" />
+                        <NavigationViewItem Content="外部资源" Tag="geo-resources" Icon="World" />
+                    </NavigationViewItem.MenuItems>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
 
             <ContentControl
@@ -99,13 +111,34 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock TextWrapping="Wrap" Text="{x:Bind ViewModel.Message, Mode=OneWay}" />
                 <TextBlock
+                    VerticalAlignment="Center"
+                    TextWrapping="Wrap"
+                    Text="{x:Bind ViewModel.Message, Mode=OneWay}" />
+                <StackPanel
                     Grid.Column="1"
                     VerticalAlignment="Center"
-                    DataContext="{x:Bind ViewModel}"
-                    Text="有未保存更改"
-                    Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVis}}" />
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    DataContext="{x:Bind ViewModel}">
+                    <ProgressRing
+                        Width="16"
+                        Height="16"
+                        IsActive="{x:Bind ViewModel.IsSaving, Mode=OneWay}"
+                        Visibility="{Binding IsSaving, Converter={StaticResource BoolToVis}}" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Text="有未保存更改"
+                        Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVis}}" />
+                    <Button
+                        Command="{x:Bind ViewModel.UndoChangesCommand}"
+                        Content="撤销"
+                        IsEnabled="{x:Bind ViewModel.CanSave, Mode=OneWay}" />
+                    <Button
+                        Command="{x:Bind ViewModel.SaveSettingsCommand}"
+                        Content="保存"
+                        IsEnabled="{x:Bind ViewModel.CanSave, Mode=OneWay}" />
+                </StackPanel>
             </Grid>
         </Grid>
 

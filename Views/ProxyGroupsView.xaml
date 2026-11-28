@@ -161,11 +161,11 @@
             <StackPanel Spacing="12">
                 <TextBox
                     Header="测试 URL"
-                    Text="{x:Bind ViewModel.ProxyGroups.DelayTestUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    Text="{x:Bind ViewModel.Settings.ProxyTestUrl, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
                 <TextBox
                     Header="超时（ms）"
                     InputScope="Number"
-                    Text="{x:Bind ViewModel.ProxyGroups.DelayTestTimeoutText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    Text="{x:Bind ViewModel.Settings.ProxyTestTimeoutText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
             </StackPanel>
         </ContentDialog>
     </Grid>

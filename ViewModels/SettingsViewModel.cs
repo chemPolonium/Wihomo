@@ -1,3 +1,4 @@
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Wihomo.Models;
 using Wihomo.Services;
@@ -5,8 +6,8 @@ using Wihomo.Services;
 namespace Wihomo.ViewModels;
 
 /// <summary>
-/// 静态设置的视图模型，取代原来的 BindSettingsToUi / CollectSettingsFromUi 这一对控件搬运。
-/// 内核设置、DNS、外部资源与 YAML 覆写共用一次保存，与现状一致。
+/// 设置草稿。所有设置页共用同一份编辑状态：字段变化只标记 dirty，
+/// 真正落盘与热重载由 MainViewModel 统一处理。
 /// </summary>
 public sealed partial class SettingsViewModel : ObservableObject
 {
@@ -22,6 +23,18 @@ public sealed partial class SettingsViewModel : ObservableObject
         new("MMDB（默认）", "mmdb"),
         new("DAT", "dat"),
     ];
+
+    private static readonly string[] PreferenceKeys =
+    [
+        nameof(StartWithWindows),
+        nameof(StartCoreOnProgramStart),
+        nameof(StatsRefreshText),
+        nameof(ProxyTestUrl),
+        nameof(ProxyTestTimeoutText),
+    ];
+
+    private readonly Dictionary<string, string> _savedState = new(StringComparer.Ordinal);
+    private bool _isLoading;
 
     // WinUI XAML 不支持 x:Static，ComboBox 统一绑定实例属性。
     public IReadOnlyList<LabeledOption> DnsEnhancedModeOptionList => DnsEnhancedModeOptions;
@@ -58,6 +71,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _geoAutoUpdate;
     [ObservableProperty] private string _geoUpdateIntervalText = string.Empty;
     [ObservableProperty] private string _ruleOverrides = string.Empty;
+    [ObservableProperty] private string _proxyTestUrl = "http://cp.cloudflare.com/generate_204";
+    [ObservableProperty] private string _proxyTestTimeoutText = "5000";
     [ObservableProperty] private bool _isDirty;
 
     public SettingsViewModel()
@@ -65,90 +80,136 @@ public sealed partial class SettingsViewModel : ObservableObject
         _selectedDnsEnhancedMode = DnsEnhancedModeOptions[0];
         _selectedGeoDataMode = GeoDataModeOptions[0];
 
-        // 任何非 IsDirty 自身的属性变化都算未保存改动，避免逐属性手写标脏。
         PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName != nameof(IsDirty))
+            if (e.PropertyName is nameof(IsDirty) or nameof(HasPreferenceChanges) or nameof(HasConfigChanges))
             {
-                IsDirty = true;
+                return;
             }
+
+            RefreshDirty();
         };
     }
 
+    public bool IsLoading => _isLoading;
+
+    public bool HasPreferenceChanges => PreferenceKeys.Any(key =>
+        _savedState.TryGetValue(key, out var saved) && !string.Equals(saved, StateValue(key), StringComparison.Ordinal));
+
+    public bool HasConfigChanges => _savedState.Any(pair =>
+        !PreferenceKeys.Contains(pair.Key, StringComparer.Ordinal)
+        && !string.Equals(pair.Value, StateValue(pair.Key), StringComparison.Ordinal));
+
+    public static bool IsPreferenceProperty(string? propertyName) =>
+        propertyName is not null && PreferenceKeys.Contains(propertyName, StringComparer.Ordinal);
+
     public void LoadFrom(AppSettings settings)
     {
-        var wasDirty = IsDirty;
+        _isLoading = true;
+        try
+        {
+            CorePath = settings.Core.CoreExecutablePath;
+            CoreWorkDir = settings.Core.WorkingDirectory;
+            ControllerHost = settings.Core.ExternalControllerHost;
+            ControllerPortText = settings.Core.ExternalControllerPort.ToString(CultureInfo.InvariantCulture);
+            MixedPortText = settings.Core.MixedPort.ToString(CultureInfo.InvariantCulture);
+            SocksPortText = settings.Core.SocksPort.ToString(CultureInfo.InvariantCulture);
+            HttpPortText = settings.Core.HttpPort.ToString(CultureInfo.InvariantCulture);
+            Secret = settings.Core.Secret;
+            StatsRefreshText = settings.StatsRefreshSeconds.ToString(CultureInfo.InvariantCulture);
+            EnableSystemProxy = settings.Core.EnableSystemProxy;
+            BypassLocalNetworks = settings.Core.BypassLocalNetworks;
+            StartCoreOnProgramStart = settings.StartCoreOnProgramStart;
+            StartWithWindows = settings.StartWithWindows;
+
+            EnableDns = settings.Dns.Enable;
+            DnsListen = settings.Dns.Listen;
+            SelectedDnsEnhancedMode = FindOption(DnsEnhancedModeOptions, settings.Dns.EnhancedMode);
+            DefaultNameserverText = JoinLines(settings.Dns.DefaultNameserver);
+            NameserverText = JoinLines(settings.Dns.Nameserver);
+            FallbackText = JoinLines(settings.Dns.Fallback);
+
+            GeoIpUrl = settings.GeoxUrls.GeoIp;
+            GeoSiteUrl = settings.GeoxUrls.GeoSite;
+            MmdbUrl = settings.GeoxUrls.Mmdb;
+            AsnUrl = settings.GeoxUrls.Asn;
+            SelectedGeoDataMode = GeoDataModeOptions[settings.GeoDataMode ? 1 : 0];
+            GeoAutoUpdate = settings.GeoAutoUpdate;
+            GeoUpdateIntervalText = settings.GeoUpdateIntervalHours.ToString(CultureInfo.InvariantCulture);
+
+            RuleOverrides = settings.RuleOverrides;
+            ProxyTestUrl = settings.ProxyTest.Url;
+            ProxyTestTimeoutText = settings.ProxyTest.TimeoutMilliseconds.ToString(CultureInfo.InvariantCulture);
+
+            CaptureSavedState();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+
         IsDirty = false;
+        OnPropertyChanged(nameof(HasPreferenceChanges));
+        OnPropertyChanged(nameof(HasConfigChanges));
+    }
 
-        CorePath = settings.Core.CoreExecutablePath;
-        CoreWorkDir = settings.Core.WorkingDirectory;
-        ControllerHost = settings.Core.ExternalControllerHost;
-        ControllerPortText = settings.Core.ExternalControllerPort.ToString();
-        MixedPortText = settings.Core.MixedPort.ToString();
-        SocksPortText = settings.Core.SocksPort.ToString();
-        HttpPortText = settings.Core.HttpPort.ToString();
-        Secret = settings.Core.Secret;
-        StatsRefreshText = settings.StatsRefreshSeconds.ToString();
-        EnableSystemProxy = settings.Core.EnableSystemProxy;
-        BypassLocalNetworks = settings.Core.BypassLocalNetworks;
-        StartCoreOnProgramStart = settings.StartCoreOnProgramStart;
-        StartWithWindows = settings.StartWithWindows;
+    public void MarkSaved()
+    {
+        CaptureSavedState();
+        IsDirty = false;
+        OnPropertyChanged(nameof(HasPreferenceChanges));
+        OnPropertyChanged(nameof(HasConfigChanges));
+    }
 
-        EnableDns = settings.Dns.Enable;
-        DnsListen = settings.Dns.Listen;
-        SelectedDnsEnhancedMode = FindOption(DnsEnhancedModeOptions, settings.Dns.EnhancedMode);
-        DefaultNameserverText = JoinLines(settings.Dns.DefaultNameserver);
-        NameserverText = JoinLines(settings.Dns.Nameserver);
-        FallbackText = JoinLines(settings.Dns.Fallback);
+    /// <summary>自动保存偏好字段后，只更新这些字段的基线，避免把配置类修改也标成已保存。</summary>
+    public void MarkPreferencesSaved()
+    {
+        foreach (var key in PreferenceKeys)
+        {
+            _savedState[key] = StateValue(key);
+        }
 
-        GeoIpUrl = settings.GeoxUrls.GeoIp;
-        GeoSiteUrl = settings.GeoxUrls.GeoSite;
-        MmdbUrl = settings.GeoxUrls.Mmdb;
-        AsnUrl = settings.GeoxUrls.Asn;
-        SelectedGeoDataMode = GeoDataModeOptions[settings.GeoDataMode ? 1 : 0];
-        GeoAutoUpdate = settings.GeoAutoUpdate;
-        GeoUpdateIntervalText = settings.GeoUpdateIntervalHours.ToString();
+        IsDirty = HasPreferenceChanges || HasConfigChanges;
+        OnPropertyChanged(nameof(HasPreferenceChanges));
+        OnPropertyChanged(nameof(HasConfigChanges));
+    }
 
-        RuleOverrides = settings.RuleOverrides;
-
-        IsDirty = wasDirty;
+    public void MarkDirty()
+    {
+        IsDirty = true;
+        OnPropertyChanged(nameof(HasPreferenceChanges));
+        OnPropertyChanged(nameof(HasConfigChanges));
     }
 
     /// <summary>
-    /// 校验并写回设置对象。未在本视图暴露的字段（fake-ip-filter、fallback-filter 等）原样保留。
+    /// 校验并写回设置对象。只校验本次真正修改过的字段：未修改的配置即使历史上不合法，
+    /// 也不应阻塞其它设置保存。未在界面暴露的字段原样保留。
     /// </summary>
     public void ApplyTo(AppSettings settings)
     {
         // 先全部解析再写入：任一校验失败时不得留下半新半旧的设置。
-        if (string.IsNullOrWhiteSpace(CorePath))
-        {
-            throw new InvalidOperationException("内核路径不能为空。");
-        }
+        var corePath = RequireIfChanged(CorePath, settings.Core.CoreExecutablePath, "内核路径不能为空。");
+        var coreWorkDir = RequireIfChanged(CoreWorkDir, settings.Core.WorkingDirectory, "工作目录不能为空。");
+        var controllerHost = RequireIfChanged(ControllerHost, settings.Core.ExternalControllerHost, "External Controller Host 不能为空。");
+        var controllerPort = ParsePositiveIntIfChanged(ControllerPortText, settings.Core.ExternalControllerPort, "External Controller Port");
+        var mixedPort = ParsePositiveIntIfChanged(MixedPortText, settings.Core.MixedPort, "Mixed Port");
+        var socksPort = ParsePositiveIntIfChanged(SocksPortText, settings.Core.SocksPort, "SOCKS Port");
+        var httpPort = ParsePositiveIntIfChanged(HttpPortText, settings.Core.HttpPort, "HTTP Port");
+        var statsRefresh = ParsePositiveIntIfChanged(StatsRefreshText, settings.StatsRefreshSeconds, "统计刷新间隔(秒)");
+        var geoUpdateInterval = ParsePositiveIntIfChanged(GeoUpdateIntervalText, settings.GeoUpdateIntervalHours, "GEO 更新间隔（小时）");
+        var geoIp = ParseUrlIfChanged(GeoIpUrl, settings.GeoxUrls.GeoIp, "GeoIP 数据库 URL");
+        var geoSite = ParseUrlIfChanged(GeoSiteUrl, settings.GeoxUrls.GeoSite, "GeoSite 数据库 URL");
+        var mmdb = ParseUrlIfChanged(MmdbUrl, settings.GeoxUrls.Mmdb, "MMDB 数据库 URL");
+        var asn = ParseUrlIfChanged(AsnUrl, settings.GeoxUrls.Asn, "ASN 数据库 URL");
+        var proxyTestUrl = ParseUrlIfChanged(ProxyTestUrl, settings.ProxyTest.Url, "测速 URL");
+        var proxyTestTimeout = ParsePositiveIntIfChanged(
+            ProxyTestTimeoutText,
+            settings.ProxyTest.TimeoutMilliseconds,
+            "测速超时(ms)");
 
-        if (string.IsNullOrWhiteSpace(CoreWorkDir))
-        {
-            throw new InvalidOperationException("工作目录不能为空。");
-        }
-
-        if (string.IsNullOrWhiteSpace(ControllerHost))
-        {
-            throw new InvalidOperationException("External Controller Host 不能为空。");
-        }
-
-        var controllerPort = SettingsParsing.ParsePositiveInt(ControllerPortText, "External Controller Port");
-        var mixedPort = SettingsParsing.ParsePositiveInt(MixedPortText, "Mixed Port");
-        var socksPort = SettingsParsing.ParsePositiveInt(SocksPortText, "SOCKS Port");
-        var httpPort = SettingsParsing.ParsePositiveInt(HttpPortText, "HTTP Port");
-        var statsRefresh = SettingsParsing.ParsePositiveInt(StatsRefreshText, "统计刷新间隔(秒)");
-        var geoUpdateInterval = SettingsParsing.ParsePositiveInt(GeoUpdateIntervalText, "GEO 更新间隔（小时）");
-        var geoIp = SettingsParsing.ParseAbsoluteUrl(GeoIpUrl, "GeoIP 数据库 URL");
-        var geoSite = SettingsParsing.ParseAbsoluteUrl(GeoSiteUrl, "GeoSite 数据库 URL");
-        var mmdb = SettingsParsing.ParseAbsoluteUrl(MmdbUrl, "MMDB 数据库 URL");
-        var asn = SettingsParsing.ParseAbsoluteUrl(AsnUrl, "ASN 数据库 URL");
-
-        settings.Core.CoreExecutablePath = CorePath.Trim();
-        settings.Core.WorkingDirectory = CoreWorkDir.Trim();
-        settings.Core.ExternalControllerHost = ControllerHost.Trim();
+        settings.Core.CoreExecutablePath = corePath;
+        settings.Core.WorkingDirectory = coreWorkDir;
+        settings.Core.ExternalControllerHost = controllerHost;
         settings.Core.ExternalControllerPort = controllerPort;
         settings.Core.MixedPort = mixedPort;
         settings.Core.SocksPort = socksPort;
@@ -164,6 +225,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         settings.GeoUpdateIntervalHours = geoUpdateInterval;
         settings.GeoDataMode = SelectedGeoDataMode.Value == "dat";
         settings.RuleOverrides = RuleOverrides;
+        settings.ProxyTest.Url = proxyTestUrl;
+        settings.ProxyTest.TimeoutMilliseconds = proxyTestTimeout;
 
         settings.Dns.Enable = EnableDns;
         settings.Dns.Listen = DnsListen.Trim();
@@ -176,8 +239,136 @@ public sealed partial class SettingsViewModel : ObservableObject
         settings.GeoxUrls.GeoSite = geoSite;
         settings.GeoxUrls.Mmdb = mmdb;
         settings.GeoxUrls.Asn = asn;
+    }
 
-        IsDirty = false;
+    /// <summary>自动保存只写偏好字段，不把未保存的内核/DNS 编辑一并落盘。</summary>
+    public void ApplyPreferencesTo(AppSettings settings)
+    {
+        settings.StatsRefreshSeconds = ParsePositiveIntIfChanged(
+            StatsRefreshText,
+            settings.StatsRefreshSeconds,
+            "统计刷新间隔(秒)");
+        settings.StartCoreOnProgramStart = StartCoreOnProgramStart;
+        settings.StartWithWindows = StartWithWindows;
+        settings.ProxyTest.Url = ParseUrlIfChanged(ProxyTestUrl, settings.ProxyTest.Url, "测速 URL");
+        settings.ProxyTest.TimeoutMilliseconds = ParsePositiveIntIfChanged(
+            ProxyTestTimeoutText,
+            settings.ProxyTest.TimeoutMilliseconds,
+            "测速超时(ms)");
+    }
+
+    private void RefreshDirty()
+    {
+        if (_isLoading)
+        {
+            return;
+        }
+
+        var dirty = HasPreferenceChanges || HasConfigChanges;
+        if (IsDirty != dirty)
+        {
+            IsDirty = dirty;
+        }
+
+        OnPropertyChanged(nameof(HasPreferenceChanges));
+        OnPropertyChanged(nameof(HasConfigChanges));
+    }
+
+    private void CaptureSavedState()
+    {
+        _savedState.Clear();
+        foreach (var key in StateKeys)
+        {
+            _savedState[key] = StateValue(key);
+        }
+    }
+
+    private string StateValue(string key) => key switch
+    {
+        nameof(CorePath) => CorePath,
+        nameof(CoreWorkDir) => CoreWorkDir,
+        nameof(ControllerHost) => ControllerHost,
+        nameof(ControllerPortText) => ControllerPortText,
+        nameof(MixedPortText) => MixedPortText,
+        nameof(SocksPortText) => SocksPortText,
+        nameof(HttpPortText) => HttpPortText,
+        nameof(Secret) => Secret,
+        nameof(StatsRefreshText) => StatsRefreshText,
+        nameof(EnableSystemProxy) => BoolValue(EnableSystemProxy),
+        nameof(BypassLocalNetworks) => BoolValue(BypassLocalNetworks),
+        nameof(StartCoreOnProgramStart) => BoolValue(StartCoreOnProgramStart),
+        nameof(StartWithWindows) => BoolValue(StartWithWindows),
+        nameof(EnableDns) => BoolValue(EnableDns),
+        nameof(DnsListen) => DnsListen,
+        nameof(SelectedDnsEnhancedMode) => SelectedDnsEnhancedMode.Value,
+        nameof(DefaultNameserverText) => DefaultNameserverText,
+        nameof(NameserverText) => NameserverText,
+        nameof(FallbackText) => FallbackText,
+        nameof(GeoIpUrl) => GeoIpUrl,
+        nameof(GeoSiteUrl) => GeoSiteUrl,
+        nameof(MmdbUrl) => MmdbUrl,
+        nameof(AsnUrl) => AsnUrl,
+        nameof(SelectedGeoDataMode) => SelectedGeoDataMode.Value,
+        nameof(GeoAutoUpdate) => BoolValue(GeoAutoUpdate),
+        nameof(GeoUpdateIntervalText) => GeoUpdateIntervalText,
+        nameof(RuleOverrides) => RuleOverrides,
+        nameof(ProxyTestUrl) => ProxyTestUrl,
+        nameof(ProxyTestTimeoutText) => ProxyTestTimeoutText,
+        _ => string.Empty,
+    };
+
+    private static readonly string[] StateKeys =
+    [
+        nameof(CorePath), nameof(CoreWorkDir), nameof(ControllerHost), nameof(ControllerPortText),
+        nameof(MixedPortText), nameof(SocksPortText), nameof(HttpPortText), nameof(Secret),
+        nameof(StatsRefreshText), nameof(EnableSystemProxy), nameof(BypassLocalNetworks),
+        nameof(StartCoreOnProgramStart), nameof(StartWithWindows), nameof(EnableDns), nameof(DnsListen),
+        nameof(SelectedDnsEnhancedMode), nameof(DefaultNameserverText), nameof(NameserverText),
+        nameof(FallbackText), nameof(GeoIpUrl), nameof(GeoSiteUrl), nameof(MmdbUrl), nameof(AsnUrl),
+        nameof(SelectedGeoDataMode), nameof(GeoAutoUpdate), nameof(GeoUpdateIntervalText),
+        nameof(RuleOverrides), nameof(ProxyTestUrl), nameof(ProxyTestTimeoutText),
+    ];
+
+    private static string BoolValue(bool value) => value ? "1" : "0";
+
+    private static string RequireIfChanged(string text, string current, string error)
+    {
+        var value = text.Trim();
+        if (string.Equals(value, current, StringComparison.Ordinal))
+        {
+            return current;
+        }
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException(error);
+        }
+
+        return value;
+    }
+
+    private static int ParsePositiveIntIfChanged(string text, int current, string fieldName)
+    {
+        if (string.Equals(
+            text.Trim(),
+            current.ToString(CultureInfo.InvariantCulture),
+            StringComparison.Ordinal))
+        {
+            return current;
+        }
+
+        return SettingsParsing.ParsePositiveInt(text, fieldName);
+    }
+
+    private static string ParseUrlIfChanged(string text, string current, string fieldName)
+    {
+        var value = text.Trim();
+        if (string.Equals(value, current, StringComparison.Ordinal))
+        {
+            return current;
+        }
+
+        return SettingsParsing.ParseAbsoluteUrl(text, fieldName);
     }
 
     private static LabeledOption FindOption(IReadOnlyList<LabeledOption> options, string value)

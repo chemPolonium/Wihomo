@@ -28,6 +28,7 @@ public sealed partial class ProxyGroupsView : UserControl
         {
             DelaySettingsDialog.XamlRoot = Root.XamlRoot;
             await DelaySettingsDialog.ShowAsync();
+            await ViewModel.SavePreferencesNowAsync();
         }
         finally
         {

@@ -82,6 +82,36 @@ function Install-DevLayout {
         throw "开发模式松散注册需要先开启 Windows 开发者模式。"
     }
 
+    # 重新注册前先备份包数据：Remove-AppxPackage 可能清掉 LocalCache，
+    # 其中包含 %AppData%\Wihomo\settings.json 的 MSIX 重定向副本。
+    $existing = Get-AppxPackage chemPolonium.Wihomo -ErrorAction SilentlyContinue | Select-Object -First 1
+    $backupRoot = Join-Path $env:LOCALAPPDATA "Wihomo\DevBackups\$((Get-Date).ToString('yyyyMMdd-HHmmss'))"
+    $packageDataBackup = $null
+    $legacyBackup = $null
+
+    if ($existing) {
+        $packageData = Join-Path $env:LOCALAPPDATA "Packages\$($existing.PackageFamilyName)"
+        if (Test-Path $packageData) {
+            $packageDataBackup = Join-Path $backupRoot "package"
+            New-Item -ItemType Directory -Path $packageDataBackup -Force | Out-Null
+            foreach ($name in @("LocalCache", "LocalState")) {
+                $source = Join-Path $packageData $name
+                if (Test-Path $source) {
+                    Copy-Item $source (Join-Path $packageDataBackup $name) -Recurse -Force
+                }
+            }
+            Write-Host "已备份 MSIX 包数据: $backupRoot"
+        }
+    }
+
+    $legacySettings = Join-Path $env:APPDATA "Wihomo"
+    if (Test-Path $legacySettings) {
+        $legacyBackup = Join-Path $backupRoot "legacy-roaming"
+        New-Item -ItemType Directory -Path $legacyBackup -Force | Out-Null
+        Copy-Item $legacySettings (Join-Path $legacyBackup "Wihomo") -Recurse -Force
+        Write-Host "已备份旧版设置: $backupRoot"
+    }
+
     $layout = Join-Path $env:LOCALAPPDATA "Wihomo\DevLayout"
     Get-AppxPackage chemPolonium.Wihomo -ErrorAction SilentlyContinue | Remove-AppxPackage
     Remove-Item $layout -Recurse -Force -ErrorAction SilentlyContinue
@@ -97,6 +127,29 @@ function Install-DevLayout {
     }
 
     Add-AppxPackage -Register (Join-Path $layout "AppxManifest.xml")
+
+    # 恢复包数据。PackageFamilyName 通常不变；若变化则使用新名称。
+    $registered = Get-AppxPackage chemPolonium.Wihomo -ErrorAction SilentlyContinue | Select-Object -First 1
+    $familyName = if ($registered) { $registered.PackageFamilyName } elseif ($existing) { $existing.PackageFamilyName } else { $null }
+    if ($packageDataBackup -and $familyName) {
+        $target = Join-Path $env:LOCALAPPDATA "Packages\$familyName"
+        New-Item -ItemType Directory -Path $target -Force | Out-Null
+        foreach ($name in @("LocalCache", "LocalState")) {
+            $source = Join-Path $packageDataBackup $name
+            if (Test-Path $source) {
+                $destination = Join-Path $target $name
+                New-Item -ItemType Directory -Path $destination -Force | Out-Null
+                Copy-Item (Join-Path $source "*") $destination -Recurse -Force
+            }
+        }
+        Write-Host "已恢复 MSIX 包数据。"
+    }
+
+    if ($legacyBackup) {
+        Copy-Item (Join-Path $legacyBackup "Wihomo") $legacySettings -Recurse -Force
+        Write-Host "已恢复旧版设置。"
+    }
+
     Write-Host "已通过开发者模式松散注册 Wihomo: $layout"
     Write-Host "注意：不要删除该目录，否则已安装的应用无法启动。"
 }
