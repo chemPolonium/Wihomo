@@ -85,4 +85,4 @@ Write-Host "端口: mixed 8090 / socks 8091 / http 8092 / controller 9095"
 Write-Host "系统代理与开机自启已在副本中关闭。"
 Write-Host "原始设置不会被修改。"
 
-Start-Process -FilePath $ExePath
+& cmd.exe /c "start `"`" `"$ExePath`""
