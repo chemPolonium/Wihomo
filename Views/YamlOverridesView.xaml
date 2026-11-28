@@ -33,6 +33,7 @@
             <TextBox
                 x:Name="OverridesTextBox"
                 AcceptsReturn="True"
+                FontFamily="Cascadia Mono, Consolas, Courier New"
                 KeyDown="OverridesTextBox_KeyDown"
                 MinHeight="400"
                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
